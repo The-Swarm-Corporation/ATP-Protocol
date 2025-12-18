@@ -174,7 +174,7 @@ def _token_balances_by_owner_and_mint(meta: Dict[str, Any]) -> Tuple[Dict[Tuple[
 
 
 async def verify_solana_transaction(
-    sig: str,
+    sig: Any,
     expected_amount_units: int,
     sender: str,
     payment_token: PaymentToken = PaymentToken.SOL,
@@ -217,6 +217,10 @@ async def verify_solana_transaction(
         poll_interval_seconds: Poll interval while waiting for tx details.
     """
     try:
+        # solana-py / solders may surface signatures as `solders.signature.Signature`.
+        # Normalize early so RPC calls + logging behave consistently.
+        sig = str(sig)
+
         def _normalize_confirmation_status(status: Any) -> Optional[str]:
             """
             Normalize various confirmation status shapes into one of:
@@ -533,19 +537,22 @@ async def send_and_confirm_sol_payment(
             )
             if not sig:
                 raise RuntimeError(f"Failed to send transaction: {resp}")
+            sig_str = str(sig).strip()
+            if not sig_str:
+                raise RuntimeError(f"Failed to parse transaction signature: {sig}")
 
             if hasattr(client, "confirm_transaction"):
-                await client.confirm_transaction(sig, commitment=commitment)  # type: ignore[arg-type]
+                await client.confirm_transaction(sig_str, commitment=commitment)  # type: ignore[arg-type]
             else:
                 for _ in range(30):
-                    st = await client.get_signature_statuses([sig])
+                    st = await client.get_signature_statuses([sig_str])
                     if st.value and st.value[0] is not None:
                         if st.value[0].err:
                             raise RuntimeError("Transaction failed on-chain")
-                        return sig
+                        return sig_str
                     await asyncio.sleep(1)
 
-            return sig
+            return sig_str
     except Exception:
         # Log full traceback with non-sensitive context. Do NOT log payer secret key.
         logger.opt(exception=True).error(

@@ -284,6 +284,9 @@ async def settle_agent_trade(request: SettleTrade):
     finally:
         request.private_key = ""
 
+    # solana-py / solders may return Signature objects in some environments; ensure JSON-safe.
+    tx_sig = str(tx_sig).strip()
+
     is_valid, msg = await verify_solana_transaction(
         tx_sig,
         job["total_amount_units"],

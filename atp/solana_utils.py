@@ -24,6 +24,7 @@ from solana.rpc.types import TxOpts
 from solders.hash import Hash
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
+from solders.signature import Signature
 from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction as SoldersTransaction
 
@@ -143,6 +144,26 @@ def _coerce_blockhash(v: Any) -> Optional[Hash]:
     return None
 
 
+def _coerce_signature(v: Any) -> Optional[Signature]:
+    """Coerce a transaction signature into a solders `Signature` (for RPC calls)."""
+    if v is None:
+        return None
+    if isinstance(v, Signature):
+        return v
+    try:
+        s = str(v).strip()
+        if not s:
+            return None
+        return Signature.from_string(s)
+    except Exception:
+        return None
+
+
+def _signature_str(v: Any) -> str:
+    """Return a stable string representation of a tx signature for logging/JSON."""
+    return str(v).strip()
+
+
 def _token_balances_by_owner_and_mint(meta: Dict[str, Any]) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
     """
     Return (pre, post) mappings for summed SPL token balances keyed by (owner, mint),
@@ -217,9 +238,11 @@ async def verify_solana_transaction(
         poll_interval_seconds: Poll interval while waiting for tx details.
     """
     try:
-        # solana-py / solders may surface signatures as `solders.signature.Signature`.
-        # Normalize early so RPC calls + logging behave consistently.
-        sig = str(sig)
+        # Keep both forms:
+        # - sig_str: JSON/log safe
+        # - sig_rpc: solders Signature for solana-py builds that require it
+        sig_str = _signature_str(sig)
+        sig_rpc: Any = _coerce_signature(sig_str) or sig_str
 
         def _normalize_confirmation_status(status: Any) -> Optional[str]:
             """
@@ -275,7 +298,10 @@ async def verify_solana_transaction(
 
             deadline = time.time() + max_wait_seconds
             while time.time() < deadline:
-                st = await client.get_signature_statuses([sig])
+                try:
+                    st = await client.get_signature_statuses([sig_rpc])
+                except TypeError:
+                    st = await client.get_signature_statuses([sig_str])
                 if st.value and st.value[0] is not None:
                     if st.value[0].err:
                         return False, "Transaction failed on-chain."
@@ -291,12 +317,14 @@ async def verify_solana_transaction(
                 # Try to fetch tx details; prefer jsonParsed, but fall back if unsupported.
                 try:
                     tx_details = await client.get_transaction(
-                        sig,
+                        sig_str,
                         encoding="jsonParsed",
                         max_supported_transaction_version=0,
                     )
                 except TypeError:
-                    tx_details = await client.get_transaction(sig, max_supported_transaction_version=0)
+                    tx_details = await client.get_transaction(
+                        sig_str, max_supported_transaction_version=0
+                    )
 
                 tx = _unwrap_get_transaction_response(tx_details)
                 if tx and _commitment_ok(last_status or "confirmed"):
@@ -335,7 +363,7 @@ async def verify_solana_transaction(
 
                 if matched:
                     logger.info(
-                        f"SOL payment verified: sig={sig} sender={sender} recipient={expected_recipient} lamports={expected_amount_units}"
+                        f"SOL payment verified: sig={sig_str} sender={sender} recipient={expected_recipient} lamports={expected_amount_units}"
                     )
                     return True, "Verified"
 
@@ -369,7 +397,7 @@ async def verify_solana_transaction(
 
                 if recipient_delta == expected_amount_units and sender_delta <= -expected_amount_units:
                     logger.info(
-                        f"SOL payment verified (delta): sig={sig} sender={sender} recipient={expected_recipient} lamports={expected_amount_units}"
+                        f"SOL payment verified (delta): sig={sig_str} sender={sender} recipient={expected_recipient} lamports={expected_amount_units}"
                     )
                     return True, "Verified"
 
@@ -393,7 +421,7 @@ async def verify_solana_transaction(
 
             if recipient_delta == expected_amount_units and sender_delta <= -expected_amount_units:
                 logger.info(
-                    f"SPL payment verified: sig={sig} sender={sender} owner={expected_recipient} mint={mint} amount={expected_amount_units}"
+                    f"SPL payment verified: sig={sig_str} sender={sender} owner={expected_recipient} mint={mint} amount={expected_amount_units}"
                 )
                 return True, "Verified"
 
@@ -407,7 +435,7 @@ async def verify_solana_transaction(
         # Avoid logging any secrets; signature + pubkeys are safe.
         logger.opt(exception=True).error(
             "verify_solana_transaction failed: sig={} token={} sender={} expected_recipient={} expected_amount_units={} commitment={}",
-            sig,
+            sig_str if "sig_str" in locals() else _signature_str(sig),
             getattr(payment_token, "value", payment_token),
             sender,
             expected_recipient,
@@ -537,15 +565,25 @@ async def send_and_confirm_sol_payment(
             )
             if not sig:
                 raise RuntimeError(f"Failed to send transaction: {resp}")
-            sig_str = str(sig).strip()
+            sig_str = _signature_str(sig)
             if not sig_str:
                 raise RuntimeError(f"Failed to parse transaction signature: {sig}")
+            sig_rpc: Any = _coerce_signature(sig_str) or sig_str
 
             if hasattr(client, "confirm_transaction"):
-                await client.confirm_transaction(sig_str, commitment=commitment)  # type: ignore[arg-type]
+                # solana-py version differences:
+                # - some builds want a string signature
+                # - others want a solders `Signature`
+                try:
+                    await client.confirm_transaction(sig_rpc, commitment=commitment)  # type: ignore[arg-type]
+                except TypeError:
+                    await client.confirm_transaction(sig_str, commitment=commitment)  # type: ignore[arg-type]
             else:
                 for _ in range(30):
-                    st = await client.get_signature_statuses([sig_str])
+                    try:
+                        st = await client.get_signature_statuses([sig_rpc])
+                    except TypeError:
+                        st = await client.get_signature_statuses([sig_str])
                     if st.value and st.value[0] is not None:
                         if st.value[0].err:
                             raise RuntimeError("Transaction failed on-chain")

@@ -101,7 +101,9 @@ def test_token_price_and_payment_info(client: httpx.Client) -> None:
     # token price: SOL
     sol = must_status(client.get("/v1/token/price/SOL"), 200)
     check(sol.get("token") == "SOL", f"bad SOL token price: {pretty(sol)}")
-    check(isinstance(sol.get("price_usd"), (int, float)), f"bad price_usd: {pretty(sol)}")
+    check(
+        isinstance(sol.get("price_usd"), (int, float)), f"bad price_usd: {pretty(sol)}"
+    )
 
     # token price: USDC (pegged)
     usdc = must_status(client.get("/v1/token/price/USDC"), 200)
@@ -110,7 +112,10 @@ def test_token_price_and_payment_info(client: httpx.Client) -> None:
 
     # invalid token
     bad = client.get("/v1/token/price/NOPE")
-    check(bad.status_code == 400, f"Expected 400 for invalid token: {bad.status_code} {bad.text}")
+    check(
+        bad.status_code == 400,
+        f"Expected 400 for invalid token: {bad.status_code} {bad.text}",
+    )
 
     # legacy endpoint
     legacy = must_status(client.get("/v1/sol/price"), 200)
@@ -119,12 +124,20 @@ def test_token_price_and_payment_info(client: httpx.Client) -> None:
 
 def test_settle_negative_cases(client: httpx.Client) -> None:
     # invalid job id
-    r = client.post("/v1/agent/settle", json={"job_id": "not-a-real-job", "private_key": "[1]"})
-    check(r.status_code in {400, 404}, f"Expected 400/404 for fake job: {r.status_code} {r.text}")
+    r = client.post(
+        "/v1/agent/settle", json={"job_id": "not-a-real-job", "private_key": "[1]"}
+    )
+    check(
+        r.status_code in {400, 404},
+        f"Expected 400/404 for fake job: {r.status_code} {r.text}",
+    )
 
     # missing fields -> 422
     r2 = client.post("/v1/agent/settle", json={"job_id": "x"})
-    check(r2.status_code == 422, f"Expected 422 for missing private_key: {r2.status_code} {r2.text}")
+    check(
+        r2.status_code == 422,
+        f"Expected 422 for missing private_key: {r2.status_code} {r2.text}",
+    )
 
 
 def maybe_trade_and_settle(client: httpx.Client) -> None:
@@ -161,12 +174,19 @@ def maybe_trade_and_settle(client: httpx.Client) -> None:
 
     payment = data.get("payment") or {}
     lamports = payment.get("amount_lamports")
-    check(isinstance(lamports, int), f"Expected integer amount_lamports: {pretty(data)}")
+    check(
+        isinstance(lamports, int), f"Expected integer amount_lamports: {pretty(data)}"
+    )
     check(lamports > 0, f"Expected lamports > 0: {lamports}")
-    check(lamports <= max_lamports, f"Refusing to spend {lamports} > ATP_MAX_LAMPORTS={max_lamports}")
+    check(
+        lamports <= max_lamports,
+        f"Refusing to spend {lamports} > ATP_MAX_LAMPORTS={max_lamports}",
+    )
 
     if not allow_spend:
-        print(f"⏭️  SKIP settle: would spend {lamports} lamports. Set ATP_ALLOW_SPEND=true to enable.")
+        print(
+            f"⏭️  SKIP settle: would spend {lamports} lamports. Set ATP_ALLOW_SPEND=true to enable."
+        )
         return
     if not private_key:
         raise RuntimeError("ATP_PRIVATE_KEY is required when ATP_ALLOW_SPEND=true")
@@ -186,7 +206,9 @@ def maybe_trade_and_settle(client: httpx.Client) -> None:
 
 
 def main() -> int:
-    base_url = (_env("ATP_BASE_URL", "https://atp-protocol-production.up.railway.app") or "").rstrip("/")
+    base_url = (
+        _env("ATP_BASE_URL", "https://atp-protocol-production.up.railway.app") or ""
+    ).rstrip("/")
     print(f"ATP integration tests against: {base_url}")
 
     failures = []
@@ -221,5 +243,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-

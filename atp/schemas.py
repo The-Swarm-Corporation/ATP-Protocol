@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 from swarms.schemas.mcp_schemas import MCPConnection, MultipleMCPConnections
@@ -96,3 +97,63 @@ class AgentSpec(BaseModel):
         arbitrary_types_allowed = True
 
 
+class PaymentToken(str, Enum):
+    """Supported payment tokens on Solana."""
+
+    SOL = "SOL"
+    USDC = "USDC"
+
+
+class AgentTask(BaseModel):
+    """Complete agent task request requiring full agent specification."""
+
+    agent_config: AgentSpec = Field(
+        ...,
+        description="Complete agent configuration specification matching the Swarms API AgentSpec schema",
+    )
+    task: str = Field(
+        ...,
+        description="The task or query to execute",
+        example="Analyze the latest SOL/USDC liquidity pool data and provide trading recommendations.",
+    )
+    user_wallet: str = Field(
+        ..., description="The Solana public key of the sender for payment verification"
+    )
+    payment_token: PaymentToken = Field(
+        default=PaymentToken.SOL,
+        description="Payment token to use for settlement (SOL or USDC)",
+    )
+    history: Optional[Union[Dict[Any, Any], List[Dict[str, str]]]] = Field(
+        default=None, description="Optional conversation history for context"
+    )
+    img: Optional[str] = Field(
+        default=None, description="Optional image URL for vision tasks"
+    )
+    imgs: Optional[List[str]] = Field(
+        default=None, description="Optional list of image URLs for vision tasks"
+    )
+
+
+class SettleTrade(BaseModel):
+    """Settlement request that asks the facilitator to sign+send the payment tx.
+
+    WARNING: This is custodial-like behavior. The private key is used in-memory only
+    for the duration of this request and is not persisted.
+    """
+
+    job_id: str = Field(..., description="Job ID from the trade creation response")
+    private_key: str = Field(
+        ...,
+        description=(
+            "Payer private key encoded as a string. Supported formats:\n"
+            "- Base58 keypair (common Solana secret key string)\n"
+            "- JSON array of ints (e.g. '[12,34,...]')"
+        ),
+    )
+    skip_preflight: bool = Field(
+        default=False, description="Whether to skip preflight simulation"
+    )
+    commitment: str = Field(
+        default="confirmed",
+        description="Confirmation level to wait for (processed|confirmed|finalized)",
+    )

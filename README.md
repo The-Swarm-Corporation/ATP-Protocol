@@ -17,6 +17,31 @@ The ATP Gateway exposes:
 
 ---
 
+## One simple end-to-end example (trade → settle)
+
+Run the server, then run:
+
+```bash
+export ATP_BASE_URL="http://localhost:8000"
+export ATP_USER_WALLET="<YOUR_SOLANA_PUBKEY>"
+export ATP_PRIVATE_KEY="<YOUR_PRIVATE_KEY_STRING>"
+
+# Safety switch: settlement will broadcast a real SOL transaction
+export ATP_ALLOW_SPEND="true"
+
+python examples/full_flow_example.py
+```
+
+Notes:
+- The first call (`/v1/agent/trade`) returns **HTTP 402** with a `job_id` and the payment challenge JSON.
+- The second call (`/v1/agent/settle`) signs+sends the SOL payment in-memory and returns **HTTP 200** with `agent_output`.
+
+Server-side pricing (optional):
+- Set `INPUT_COST_PER_MILLION_USD` and/or `OUTPUT_COST_PER_MILLION_USD` on the server to compute `usd_cost` from `usage` token counts.
+- If not set (or if token counts are missing), the gateway falls back to upstream `usage.total_cost` (and then a small default).
+
+---
+
 ## Conceptual purpose
 
 ATP exists to solve a common agentic workflow problem:

@@ -217,13 +217,50 @@ async def verify_solana_transaction(
         poll_interval_seconds: Poll interval while waiting for tx details.
     """
     try:
-        def _commitment_ok(status: Optional[str]) -> bool:
-            if not status:
+        def _normalize_confirmation_status(status: Any) -> Optional[str]:
+            """
+            Normalize various confirmation status shapes into one of:
+            processed | confirmed | finalized
+
+            solana-py / solders may return:
+            - "confirmed" (str)
+            - TransactionConfirmationStatus.Finalized (enum-like)
+            - TransactionConfirmationStatus.Finalized wrapped in other objects
+            """
+            if status is None:
+                return None
+            if isinstance(status, str):
+                s = status.strip().lower()
+                return s or None
+
+            # Enum-like: prefer `.name`
+            name = getattr(status, "name", None)
+            if isinstance(name, str) and name:
+                return name.strip().lower()
+
+            # Sometimes `.value` is present
+            value = getattr(status, "value", None)
+            if isinstance(value, str) and value:
+                return value.strip().lower()
+
+            # Fallback: stringification often looks like "TransactionConfirmationStatus.Finalized"
+            try:
+                s = str(status).strip()
+                if not s:
+                    return None
+                if "." in s:
+                    s = s.split(".")[-1]
+                return s.strip().lower()
+            except Exception:
+                return None
+
+        def _commitment_ok(status: Any) -> bool:
+            normalized = _normalize_confirmation_status(status)
+            if not normalized:
                 return False
-            status = status.lower()
-            want = (commitment or "confirmed").lower()
+            want = _normalize_confirmation_status(commitment) or "confirmed"
             rank = {"processed": 1, "confirmed": 2, "finalized": 3}
-            return rank.get(status, 0) >= rank.get(want, 2)
+            return rank.get(normalized, 0) >= rank.get(want, 2)
 
         async with SolanaClient(config.SOLANA_RPC_URL) as client:
             # Wait for signature status + tx details to become available.

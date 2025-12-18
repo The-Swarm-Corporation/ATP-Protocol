@@ -12,7 +12,7 @@ At a high level:
 The ATP Gateway exposes:
 
 - `POST /v1/agent/trade`: execute + return payment challenge (402)
-- `POST /v1/agent/settle`: verify payment + release output
+- `POST /v1/agent/settle`: facilitator signs+submits payment (using provided private key) + releases output
 - optional helper endpoints for token price/payment info
 
 ---
@@ -28,7 +28,7 @@ ATP exists to solve a common agentic workflow problem:
 Key design goals:
 
 - **Agent-to-agent friendly**: the “client” can be another agent, a bot, or a backend service.
-- **No custody**: ATP verifies a payment transaction signature; it does not manage private keys.
+- **Simple integration**: clients can settle by providing a private key string for a single request (used in-memory only).
 - **Token flexibility**: support SOL today, and USDC as a stable-priced option.
 
 ---
@@ -39,6 +39,7 @@ Key design goals:
 - **ATP Gateway**: runs the upstream agent, produces the payment challenge, holds the result temporarily.
 - **Upstream Agent Service (Swarms API)**: executes the requested agent workload.
 - **Solana**: settlement rail (payment transaction + signature).
+- **Facilitator**: signs+submits the payment transaction during settlement.
 - **Agent Treasury**: receives the payment (minus the fee split logic described below).
 - **Swarms Treasury**: receives the **5% settlement fee**.
 - **Temporary lockbox**: the gateway holds the output until paid (expires after a TTL).
@@ -101,7 +102,7 @@ Instead of returning the agent output, the Gateway returns **HTTP 402** with a J
 
 ### 6) Requester pays on Solana
 
-The requester sends a single on-chain payment transaction (SOL transfer or USDC SPL transfer) and obtains a transaction signature.
+The requester provides a private key string during settlement; the gateway signs+sends the SOL payment transaction in-memory.
 
 ### 7) Settle to unlock
 
@@ -112,14 +113,14 @@ The requester calls:
 with:
 
 - `job_id`
-- `tx_signature`
+- `private_key`
 
 ### 8) Gateway verifies and releases the output
 
 The Gateway:
 
 - looks up the pending job by `job_id`,
-- verifies the transaction signature exists and succeeded,
+- signs+sends the on-chain payment transaction and verifies it succeeded,
 - releases the output exactly once (prevents double-settlement),
 - returns the stored `agent_output` and settlement details.
 
@@ -135,9 +136,8 @@ flowchart LR
   G -->|Execute task| S["Swarms Agent API<br/>Upstream execution"]
   S -->|Result + usage cost| G
 
-  A <-->|Send payment tx + get signature| C["Solana<br/>(SOL / USDC)"]
-
-  A -->|POST /v1/agent/settle<br/>(job_id, tx_signature)| G
+  A -->|POST /v1/agent/settle<br/>(job_id, private_key)| G
+  G <-->|Send payment tx| C["Solana<br/>(SOL / USDC)"]
   G -->|Verify signature status| C
   G -->|Unlocked agent output| A
 
@@ -162,10 +162,9 @@ sequenceDiagram
   G->>G: Lock result (job_id, ttl)
   G-->>A: 402 Payment Required<br/>(job_id + payment instruction)
 
-  A->>C: Send payment tx (SOL/USDC)<br/>recipient=Agent Treasury
-  C-->>A: tx_signature
-
-  A->>G: POST /v1/agent/settle (job_id, tx_signature)
+  A->>G: POST /v1/agent/settle (job_id, private_key)
+  G->>C: Send payment tx (SOL/USDC)<br/>recipient=Agent Treasury
+  C-->>G: tx_signature
   G->>G: Load locked job by job_id
   G->>C: Verify tx signature success
   G->>G: Release output once
@@ -179,7 +178,7 @@ stateDiagram-v2
   [*] --> Created: /v1/agent/trade<br/>job_id minted
   Created --> Locked: result locked until paid
   Locked --> Expired: TTL elapses<br/>(no settlement)
-  Locked --> Settling: /v1/agent/settle<br/>signature submitted
+  Locked --> Settling: /v1/agent/settle<br/>signed payment submitted
   Settling --> Released: signature verified<br/>output released
   Settling --> Locked: verification failed<br/>job remains until TTL
   Released --> [*]

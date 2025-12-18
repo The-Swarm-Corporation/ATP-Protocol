@@ -14,7 +14,7 @@ It performs:
 No CLI parsing and no printing; on failures it raises exceptions.
 
 Configure via environment variables:
-- ATP_BASE_URL (default: http://localhost:8080)
+- ATP_BASE_URL (default: http://localhost:8000)
 - ATP_USER_WALLET (required)
 - ATP_PAYMENT_TOKEN (default: SOL)  # SOL or USDC
 - ATP_TASK (optional)
@@ -32,7 +32,7 @@ import httpx
 
 
 if __name__ == "__main__":
-    base_url = os.getenv("ATP_BASE_URL", "http://localhost:8080").rstrip("/")
+    base_url = os.getenv("ATP_BASE_URL", "http://localhost:8000").rstrip("/")
     user_wallet = os.getenv("ATP_USER_WALLET")
     token = os.getenv("ATP_PAYMENT_TOKEN", "SOL").upper()
     task = os.getenv(

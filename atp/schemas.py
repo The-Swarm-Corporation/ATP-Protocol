@@ -1,9 +1,4 @@
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-)
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 from swarms.schemas.mcp_schemas import MCPConnection, MultipleMCPConnections
@@ -99,3 +94,5 @@ class AgentSpec(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+

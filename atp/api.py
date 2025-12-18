@@ -24,7 +24,7 @@ from solders.pubkey import Pubkey
 from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction as SoldersTransaction
 
-from schemas import AgentSpec
+from atp.schemas import AgentSpec
 
 load_dotenv()
 

@@ -56,7 +56,7 @@ The requester calls:
 
 with:
 
-- `agent_config`: full agent spec (see `schemas.py:AgentSpec`)
+- `agent_config`: full agent spec (see `atp/schemas.py:AgentSpec`)
 - `task`: what to do
 - `user_wallet`: payer public key (used during verification)
 - `payment_token`: `SOL` or `USDC`

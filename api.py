@@ -18,10 +18,11 @@ from solana.rpc.async_api import AsyncClient as SolanaClient
 # Note: per user request, focus on core transaction handling logic.
 # The project already depends on `solana` + `solders`; imports are expected to work in runtime.
 from solana.rpc.types import TxOpts
-from solana.transaction import Transaction  # type: ignore[import-not-found]
+from solders.hash import Hash
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.system_program import TransferParams, transfer
+from solders.transaction import Transaction as SoldersTransaction
 
 from schemas import AgentSpec
 
@@ -547,13 +548,45 @@ async def _send_and_confirm_sol_payment(
     )
 
     async with SolanaClient(SOLANA_RPC_URL) as client:
-        tx = Transaction()
-        tx.add(ix)
+        # Build a legacy transaction using solders to avoid relying on `solana.transaction`,
+        # which may not exist in some solana-py distributions.
+        latest = await client.get_latest_blockhash()
+        blockhash_str = None
+        if isinstance(latest, dict):
+            # solana-py classic shape: {"result": {"value": {"blockhash": "..."}}}
+            blockhash_str = (
+                (latest.get("result") or {}).get("value") or {}
+            ).get("blockhash")
+        else:
+            # new response objects often have `.value.blockhash`
+            value = getattr(latest, "value", None)
+            blockhash_str = getattr(value, "blockhash", None) if value else None
+
+        if not blockhash_str:
+            raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
+
+        recent_blockhash = Hash.from_string(blockhash_str)
+
+        if hasattr(SoldersTransaction, "new_signed_with_payer"):
+            tx = SoldersTransaction.new_signed_with_payer(  # type: ignore[attr-defined]
+                [ix],
+                payer.pubkey(),
+                [payer],
+                recent_blockhash,
+            )
+        else:
+            # Fallback for older solders builds
+            from solders.message import Message
+
+            msg = Message.new_with_blockhash([ix], payer.pubkey(), recent_blockhash)
+            tx = SoldersTransaction.new_unsigned(msg)
+            tx.sign([payer], recent_blockhash)
+
+        raw_tx = tx.to_bytes() if hasattr(tx, "to_bytes") else bytes(tx)
 
         # Send transaction
-        resp = await client.send_transaction(
-            tx,
-            payer,
+        resp = await client.send_raw_transaction(
+            raw_tx,
             opts=TxOpts(
                 skip_preflight=skip_preflight,
                 preflight_commitment=commitment,

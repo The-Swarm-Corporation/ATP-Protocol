@@ -1,17 +1,19 @@
 # ATP-Protocol
 
-ATP Protocol is a **payment-gated execution gateway** that makes **agent-to-agent payments** and “pay to unlock results” easy on **Solana**, with **simple onboarding** (one HTTP API + a treasury address).
+ATP Protocol is a **payment-gated agent execution API** that makes **agent-to-agent payments** and “pay to unlock results” easy on **Solana**, with a simple client integration (two endpoints + a Solana payment).
 
 At a high level:
+
 - An agent (or any client) requests work from another agent via the ATP Gateway.
 - The Gateway executes the upstream agent immediately, but **returns a 402 challenge** instead of the result.
 - The requester pays **once** to the agent treasury (in **SOL** or **USDC**).
 - After settlement, the Gateway releases the stored agent output.
 
-The current implementation lives in `api.py` and exposes:
+The ATP Gateway exposes:
+
 - `POST /v1/agent/trade`: execute + return payment challenge (402)
 - `POST /v1/agent/settle`: verify payment + release output
-- `GET /health`, plus a few helper endpoints for token price/payment info
+- optional helper endpoints for token price/payment info
 
 ---
 
@@ -24,8 +26,8 @@ ATP exists to solve a common agentic workflow problem:
 - Because the settlement happens on Solana, it’s **cheap**, **fast**, and can be done by **another agent** programmatically (no human-in-the-loop required).
 
 Key design goals:
+
 - **Agent-to-agent friendly**: the “client” can be another agent, a bot, or a backend service.
-- **Simple onboarding**: run a gateway + set `AGENT_TREASURY_PUBKEY` and `SWARMS_API_KEY`.
 - **No custody**: ATP verifies a payment transaction signature; it does not manage private keys.
 - **Token flexibility**: support SOL today, and USDC as a stable-priced option.
 
@@ -39,7 +41,7 @@ Key design goals:
 - **Solana**: settlement rail (payment transaction + signature).
 - **Agent Treasury**: receives the payment (minus the fee split logic described below).
 - **Swarms Treasury**: receives the **5% settlement fee**.
-- **Redis Job Vault**: temporary storage for “locked” results keyed by `job_id` with TTL expiration.
+- **Temporary lockbox**: the gateway holds the output until paid (expires after a TTL).
 
 ---
 
@@ -48,9 +50,11 @@ Key design goals:
 ### 1) Request a trade (create challenge)
 
 The requester calls:
+
 - `POST /v1/agent/trade`
 
 with:
+
 - `agent_config`: full agent spec (see `schemas.py:AgentSpec`)
 - `task`: what to do
 - `user_wallet`: payer public key (used during verification)
@@ -64,6 +68,7 @@ The Gateway forwards the request to the upstream agent service (`SWARMS_API_URL`
 ### 3) Gateway computes the price + fee split
 
 The Gateway:
+
 - reads the USD cost from upstream usage (`usage.total_cost`, with a fallback),
 - fetches token/USD price (SOL via CoinGecko, USDC treated as $1),
 - computes the **total payment** and the **5% settlement fee**.
@@ -79,13 +84,14 @@ Important: the fee is **taken from the total** (not added on top):
 
 ### 4) Gateway stores the result (locked) with a TTL
 
-The agent output + pricing metadata is stored in Redis under a generated `job_id`.
+The agent output is held in a temporary lockbox under a generated `job_id`.
 
 If the requester never pays, the job expires automatically (default TTL: 10 minutes).
 
 ### 5) Gateway returns a 402 Payment Required challenge
 
 Instead of returning the agent output, the Gateway returns **HTTP 402** with a JSON payload containing:
+
 - `job_id`
 - `recipient` (the agent treasury pubkey)
 - amount to pay (in lamports or USDC micro-units)
@@ -100,18 +106,21 @@ The requester sends a single on-chain payment transaction (SOL transfer or USDC 
 ### 7) Settle to unlock
 
 The requester calls:
+
 - `POST /v1/agent/settle`
 
 with:
+
 - `job_id`
 - `tx_signature`
 
 ### 8) Gateway verifies and releases the output
 
 The Gateway:
-- looks up the job in Redis,
+
+- looks up the pending job by `job_id`,
 - verifies the transaction signature exists and succeeded,
-- atomically “pops” the job from Redis (prevents double-settlement),
+- releases the output exactly once (prevents double-settlement),
 - returns the stored `agent_output` and settlement details.
 
 ---
@@ -122,21 +131,18 @@ The Gateway:
 
 ```mermaid
 flowchart LR
-  A[Requester\n(Agent A / App / Bot)] -->|POST /v1/agent/trade| G[ATP Gateway\nFastAPI]
-  G -->|Execute task| S[Swarms Agent API\nUpstream execution]
+  A["Requester<br/>(Agent A / App / Bot)"] -->|POST /v1/agent/trade| G["ATP Gateway<br/>FastAPI"]
+  G -->|Execute task| S["Swarms Agent API<br/>Upstream execution"]
   S -->|Result + usage cost| G
 
-  G -->|Store locked result + pricing| R[(Redis\nJob Vault + TTL)]
+  A <-->|Send payment tx + get signature| C["Solana<br/>(SOL / USDC)"]
 
-  A <-->|Send payment tx + get signature| C[Solana\n(SOL / USDC)]
-
-  A -->|POST /v1/agent/settle\n(job_id, tx_signature)| G
+  A -->|POST /v1/agent/settle<br/>(job_id, tx_signature)| G
   G -->|Verify signature status| C
-  G -->|Pop + release output| R
   G -->|Unlocked agent output| A
 
   C --> T1[Agent Treasury]
-  C --> T2[Swarms Treasury\n(5% fee)]
+  C --> T2["Swarms Treasury<br/>(5% fee)"]
 ```
 
 ### End-to-end sequence (challenge → payment → settlement)
@@ -147,23 +153,22 @@ sequenceDiagram
   participant A as Requester (Agent A)
   participant G as ATP Gateway
   participant S as Swarms Agent API
-  participant R as Redis Job Vault
   participant C as Solana
 
   A->>G: POST /v1/agent/trade (agent_config, task, wallet, token)
   G->>S: Execute agent task
   S-->>G: outputs + usage.total_cost
-  G->>G: Compute total + 5% fee split\n(fetch token price)
-  G->>R: Store locked result (job_id, ttl)
-  G-->>A: 402 Payment Required\n(job_id + payment instruction)
+  G->>G: Compute total + 5% fee split<br/>(fetch token price)
+  G->>G: Lock result (job_id, ttl)
+  G-->>A: 402 Payment Required<br/>(job_id + payment instruction)
 
-  A->>C: Send payment tx (SOL/USDC)\nrecipient=Agent Treasury
+  A->>C: Send payment tx (SOL/USDC)<br/>recipient=Agent Treasury
   C-->>A: tx_signature
 
   A->>G: POST /v1/agent/settle (job_id, tx_signature)
-  G->>R: Retrieve job
+  G->>G: Load locked job by job_id
   G->>C: Verify tx signature success
-  G->>R: Pop job (atomic)
+  G->>G: Release output once
   G-->>A: 200 OK (agent_output + settlement_details)
 ```
 
@@ -171,39 +176,21 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Created: /v1/agent/trade\njob_id minted
-  Created --> Locked: result stored in Redis
-  Locked --> Expired: TTL elapses\n(no settlement)
-  Locked --> Settling: /v1/agent/settle\nsignature submitted
-  Settling --> Released: signature verified\njob popped
-  Settling --> Locked: verification failed\njob remains until TTL
+  [*] --> Created: /v1/agent/trade<br/>job_id minted
+  Created --> Locked: result locked until paid
+  Locked --> Expired: TTL elapses<br/>(no settlement)
+  Locked --> Settling: /v1/agent/settle<br/>signature submitted
+  Settling --> Released: signature verified<br/>output released
+  Settling --> Locked: verification failed<br/>job remains until TTL
   Released --> [*]
   Expired --> [*]
 ```
 
 ---
 
-## What “simple onboarding” means in practice
+## Client expectations (what you can rely on)
 
-To stand up an ATP Gateway you primarily need:
-- `SWARMS_API_KEY`: to execute upstream agent runs
-- `AGENT_TREASURY_PUBKEY`: where payments are sent
-- `REDIS_URL`: job vault storage for locked results
-- optional: `SOLANA_RPC_URL`, `JOB_TTL_SECONDS`
-
-The included `docker-compose.yml` runs the Gateway + Redis together.
-
----
-
-## Notes / current verification scope
-
-The current `verify_solana_transaction(...)` implementation checks that:
-- the transaction exists, and
-- the transaction did not fail on-chain.
-
-For production-grade settlement, you typically also verify (token-dependent):
-- **payer** matches `user_wallet`
-- **recipient** matches `AGENT_TREASURY_PUBKEY`
-- **amount** matches the quoted amount in the 402 challenge
-- for USDC: parse SPL token instructions and mint (`USDC_MINT_ADDRESS`)
-
+- **Two-call integration**: request work via `/v1/agent/trade`, then unlock via `/v1/agent/settle`.
+- **Single payment**: you pay once to the `recipient` address returned by the 402 challenge.
+- **Clear fee disclosure**: the 402 includes a breakdown showing the **5% settlement fee** and who receives it.
+- **Time-bounded**: each `job_id` expires after `ttl_seconds` if you don’t settle in time.

@@ -29,7 +29,7 @@ export ATP_PRIVATE_KEY="<YOUR_PRIVATE_KEY_STRING>"
 # Safety switch: settlement will broadcast a real SOL transaction
 export ATP_ALLOW_SPEND="true"
 
-python examples/full_flow_example.py
+python full_flow_example.py
 ```
 
 Notes:

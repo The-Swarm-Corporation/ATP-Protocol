@@ -290,6 +290,7 @@ async def settle_agent_trade(request: SettleTrade):
         payer_pubkey_str,
         payment_token,
         expected_recipient=config.AGENT_TREASURY_PUBKEY,
+        commitment=request.commitment,
     )
     if not is_valid:
         raise HTTPException(

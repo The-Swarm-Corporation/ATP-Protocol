@@ -180,6 +180,9 @@ async def verify_solana_transaction(
     payment_token: PaymentToken = PaymentToken.SOL,
     expected_recipient: Optional[str] = None,
     expected_mint: Optional[str] = None,
+    commitment: str = "confirmed",
+    max_wait_seconds: int = 30,
+    poll_interval_seconds: float = 1.0,
 ) -> tuple[bool, str]:
     """Verify a Solana transaction signature (best-effort).
 
@@ -209,24 +212,57 @@ async def verify_solana_transaction(
         expected_recipient: Required for production-grade verification. For SOL this is the destination pubkey.
             For SPL tokens, pass the expected **owner** (e.g., treasury pubkey) whose token holdings should increase.
         expected_mint: For SPL tokens, the expected mint address (e.g., USDC mint).
+        commitment: Desired confirmation level (processed|confirmed|finalized). Used for polling.
+        max_wait_seconds: Max time to wait for `get_transaction` to become available.
+        poll_interval_seconds: Poll interval while waiting for tx details.
     """
     try:
+        def _commitment_ok(status: Optional[str]) -> bool:
+            if not status:
+                return False
+            status = status.lower()
+            want = (commitment or "confirmed").lower()
+            rank = {"processed": 1, "confirmed": 2, "finalized": 3}
+            return rank.get(status, 0) >= rank.get(want, 2)
+
         async with SolanaClient(config.SOLANA_RPC_URL) as client:
-            tx_response = await client.get_signature_statuses([sig])
-            if not tx_response.value or tx_response.value[0] is None:
-                return False, "Transaction not found."
+            # Wait for signature status + tx details to become available.
+            # Even after `confirm_transaction`, some RPC nodes take a moment before `get_transaction` returns data.
+            tx: Optional[Dict[str, Any]] = None
+            last_status: Optional[str] = None
+            import time
 
-            if tx_response.value[0].err:
-                return False, "Transaction failed on-chain."
+            deadline = time.time() + max_wait_seconds
+            while time.time() < deadline:
+                st = await client.get_signature_statuses([sig])
+                if st.value and st.value[0] is not None:
+                    if st.value[0].err:
+                        return False, "Transaction failed on-chain."
+                    last_status = getattr(st.value[0], "confirmation_status", None) or getattr(
+                        st.value[0], "confirmationStatus", None
+                    )
+                    # Some versions expose dict-like status objects
+                    if isinstance(st.value[0], dict):
+                        last_status = st.value[0].get("confirmationStatus") or st.value[0].get(
+                            "confirmation_status"
+                        )
 
-            # Fetch transaction details in parsed form so we can validate sender/recipient/amount.
-            # Note: response shape varies across solana-py versions.
-            tx_details = await client.get_transaction(
-                sig,
-                encoding="jsonParsed",
-                max_supported_transaction_version=0,
-            )
-            tx = _unwrap_get_transaction_response(tx_details)
+                # Try to fetch tx details; prefer jsonParsed, but fall back if unsupported.
+                try:
+                    tx_details = await client.get_transaction(
+                        sig,
+                        encoding="jsonParsed",
+                        max_supported_transaction_version=0,
+                    )
+                except TypeError:
+                    tx_details = await client.get_transaction(sig, max_supported_transaction_version=0)
+
+                tx = _unwrap_get_transaction_response(tx_details)
+                if tx and _commitment_ok(last_status or "confirmed"):
+                    break
+
+                await asyncio.sleep(poll_interval_seconds)
+
             if not tx:
                 return False, "Could not fetch transaction details."
 
@@ -326,7 +362,17 @@ async def verify_solana_transaction(
             )
 
     except Exception as e:
-        logger.error(f"Error verifying transaction {sig}: {e}")
+        # Log full traceback server-side for debugging/ops.
+        # Avoid logging any secrets; signature + pubkeys are safe.
+        logger.opt(exception=True).error(
+            "verify_solana_transaction failed: sig={} token={} sender={} expected_recipient={} expected_amount_units={} commitment={}",
+            sig,
+            getattr(payment_token, "value", payment_token),
+            sender,
+            expected_recipient,
+            expected_amount_units,
+            commitment,
+        )
         return False, f"Verification error: {str(e)}"
 
 
@@ -346,23 +392,28 @@ def parse_keypair_from_string(private_key_str: str) -> Keypair:
     Raises:
         ValueError: If the key is empty or the format is unsupported/invalid.
     """
-    s = (private_key_str or "").strip()
-    if not s:
-        raise ValueError("Empty private_key")
+    try:
+        s = (private_key_str or "").strip()
+        if not s:
+            raise ValueError("Empty private_key")
 
-    if s.startswith("["):
-        arr = json.loads(s)
-        if not isinstance(arr, list) or not all(isinstance(x, int) for x in arr):
-            raise ValueError("Invalid JSON private key; expected a list of ints")
-        key_bytes = bytes(arr)
-        return Keypair.from_bytes(key_bytes)
+        if s.startswith("["):
+            arr = json.loads(s)
+            if not isinstance(arr, list) or not all(isinstance(x, int) for x in arr):
+                raise ValueError("Invalid JSON private key; expected a list of ints")
+            key_bytes = bytes(arr)
+            return Keypair.from_bytes(key_bytes)
 
-    if hasattr(Keypair, "from_base58_string"):
-        return Keypair.from_base58_string(s)  # type: ignore[attr-defined]
+        if hasattr(Keypair, "from_base58_string"):
+            return Keypair.from_base58_string(s)  # type: ignore[attr-defined]
 
-    raise ValueError(
-        "Unsupported private_key format for this runtime. Provide a JSON array of ints."
-    )
+        raise ValueError(
+            "Unsupported private_key format for this runtime. Provide a JSON array of ints."
+        )
+    except Exception:
+        # Never log the key itself. Just log that parsing failed.
+        logger.opt(exception=True).error("parse_keypair_from_string failed")
+        raise
 
 
 async def send_and_confirm_sol_payment(
@@ -392,66 +443,80 @@ async def send_and_confirm_sol_payment(
     if lamports <= 0:
         raise ValueError("lamports must be > 0")
 
-    recipient = Pubkey.from_string(recipient_pubkey_str)
-    ix = transfer(
-        TransferParams(
-            from_pubkey=payer.pubkey(), to_pubkey=recipient, lamports=lamports
-        )
-    )
-
-    async with SolanaClient(config.SOLANA_RPC_URL) as client:
-        latest = await client.get_latest_blockhash()
-        blockhash_val: Any = None
-        if isinstance(latest, dict):
-            blockhash_val = ((latest.get("result") or {}).get("value") or {}).get(
-                "blockhash"
+    try:
+        recipient = Pubkey.from_string(recipient_pubkey_str)
+        ix = transfer(
+            TransferParams(
+                from_pubkey=payer.pubkey(), to_pubkey=recipient, lamports=lamports
             )
-        else:
-            value = getattr(latest, "value", None)
-            blockhash_val = getattr(value, "blockhash", None) if value else None
+        )
 
-        recent_blockhash = _coerce_blockhash(blockhash_val)
-        if not recent_blockhash:
-            raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
+        async with SolanaClient(config.SOLANA_RPC_URL) as client:
+            latest = await client.get_latest_blockhash()
+            blockhash_val: Any = None
+            if isinstance(latest, dict):
+                blockhash_val = ((latest.get("result") or {}).get("value") or {}).get(
+                    "blockhash"
+                )
+            else:
+                value = getattr(latest, "value", None)
+                blockhash_val = getattr(value, "blockhash", None) if value else None
 
-        if hasattr(SoldersTransaction, "new_signed_with_payer"):
-            tx = SoldersTransaction.new_signed_with_payer(  # type: ignore[attr-defined]
-                [ix],
-                payer.pubkey(),
-                [payer],
-                recent_blockhash,
+            recent_blockhash = _coerce_blockhash(blockhash_val)
+            if not recent_blockhash:
+                raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
+
+            if hasattr(SoldersTransaction, "new_signed_with_payer"):
+                tx = SoldersTransaction.new_signed_with_payer(  # type: ignore[attr-defined]
+                    [ix],
+                    payer.pubkey(),
+                    [payer],
+                    recent_blockhash,
+                )
+            else:
+                from solders.message import Message
+
+                msg = Message.new_with_blockhash([ix], payer.pubkey(), recent_blockhash)
+                tx = SoldersTransaction.new_unsigned(msg)
+                tx.sign([payer], recent_blockhash)
+
+            raw_tx = tx.to_bytes() if hasattr(tx, "to_bytes") else bytes(tx)
+
+            resp = await client.send_raw_transaction(
+                raw_tx,
+                opts=TxOpts(
+                    skip_preflight=skip_preflight, preflight_commitment=commitment
+                ),
             )
-        else:
-            from solders.message import Message
 
-            msg = Message.new_with_blockhash([ix], payer.pubkey(), recent_blockhash)
-            tx = SoldersTransaction.new_unsigned(msg)
-            tx.sign([payer], recent_blockhash)
+            sig = (
+                resp.get("result")
+                if isinstance(resp, dict)
+                else getattr(resp, "value", None) or getattr(resp, "result", None)
+            )
+            if not sig:
+                raise RuntimeError(f"Failed to send transaction: {resp}")
 
-        raw_tx = tx.to_bytes() if hasattr(tx, "to_bytes") else bytes(tx)
+            if hasattr(client, "confirm_transaction"):
+                await client.confirm_transaction(sig, commitment=commitment)  # type: ignore[arg-type]
+            else:
+                for _ in range(30):
+                    st = await client.get_signature_statuses([sig])
+                    if st.value and st.value[0] is not None:
+                        if st.value[0].err:
+                            raise RuntimeError("Transaction failed on-chain")
+                        return sig
+                    await asyncio.sleep(1)
 
-        resp = await client.send_raw_transaction(
-            raw_tx,
-            opts=TxOpts(skip_preflight=skip_preflight, preflight_commitment=commitment),
+            return sig
+    except Exception:
+        # Log full traceback with non-sensitive context. Do NOT log payer secret key.
+        logger.opt(exception=True).error(
+            "send_and_confirm_sol_payment failed: payer={} recipient={} lamports={} skip_preflight={} commitment={}",
+            str(payer.pubkey()),
+            recipient_pubkey_str,
+            lamports,
+            skip_preflight,
+            commitment,
         )
-
-        sig = (
-            resp.get("result")
-            if isinstance(resp, dict)
-            else getattr(resp, "value", None) or getattr(resp, "result", None)
-        )
-        if not sig:
-            raise RuntimeError(f"Failed to send transaction: {resp}")
-
-        if hasattr(client, "confirm_transaction"):
-            await client.confirm_transaction(sig, commitment=commitment)  # type: ignore[arg-type]
-        else:
-            for _ in range(30):
-                st = await client.get_signature_statuses([sig])
-                if st.value and st.value[0] is not None:
-                    if st.value[0].err:
-                        raise RuntimeError("Transaction failed on-chain")
-                    return sig
-                await asyncio.sleep(1)
-
-        return sig
+        raise

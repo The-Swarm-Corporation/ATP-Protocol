@@ -54,8 +54,8 @@ def main() -> int:
     base_url = os.getenv(
         "ATP_BASE_URL", "https://atp-protocol-production.up.railway.app"
     ).rstrip("/")
-    user_wallet = os.getenv("ATP_USER_WALLET").strip()
-    private_key = os.getenv("ATP_PRIVATE_KEY").strip()
+    user_wallet = (os.getenv("ATP_USER_WALLET") or "").strip()
+    private_key = (os.getenv("ATP_PRIVATE_KEY") or "").strip()
     allow_spend = _bool_env("ATP_ALLOW_SPEND", default=True)
 
     if not user_wallet:

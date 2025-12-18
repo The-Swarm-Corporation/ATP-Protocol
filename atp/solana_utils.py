@@ -122,6 +122,27 @@ def _safe_int(v: Any) -> Optional[int]:
     return None
 
 
+def _coerce_blockhash(v: Any) -> Optional[Hash]:
+    """Coerce a blockhash value into a solders `Hash` across solana-py response variants."""
+    if v is None:
+        return None
+    if isinstance(v, Hash):
+        return v
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return None
+        return Hash.from_string(s)
+    # Some solana-py versions may return objects that stringify to the base58 blockhash.
+    try:
+        s = str(v).strip()
+        if s:
+            return Hash.from_string(s)
+    except Exception:
+        return None
+    return None
+
+
 def _token_balances_by_owner_and_mint(meta: Dict[str, Any]) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
     """
     Return (pre, post) mappings for summed SPL token balances keyed by (owner, mint),
@@ -380,19 +401,18 @@ async def send_and_confirm_sol_payment(
 
     async with SolanaClient(config.SOLANA_RPC_URL) as client:
         latest = await client.get_latest_blockhash()
-        blockhash_str = None
+        blockhash_val: Any = None
         if isinstance(latest, dict):
-            blockhash_str = ((latest.get("result") or {}).get("value") or {}).get(
+            blockhash_val = ((latest.get("result") or {}).get("value") or {}).get(
                 "blockhash"
             )
         else:
             value = getattr(latest, "value", None)
-            blockhash_str = getattr(value, "blockhash", None) if value else None
+            blockhash_val = getattr(value, "blockhash", None) if value else None
 
-        if not blockhash_str:
+        recent_blockhash = _coerce_blockhash(blockhash_val)
+        if not recent_blockhash:
             raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
-
-        recent_blockhash = Hash.from_string(blockhash_str)
 
         if hasattr(SoldersTransaction, "new_signed_with_payer"):
             tx = SoldersTransaction.new_signed_with_payer(  # type: ignore[attr-defined]

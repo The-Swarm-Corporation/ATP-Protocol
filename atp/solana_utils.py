@@ -32,6 +32,23 @@ from atp import config
 from atp.schemas import PaymentToken
 
 
+def _dbg_enabled() -> bool:
+    return bool(getattr(config, "ATP_SOLANA_DEBUG", False))
+
+
+def _dbg(msg: str, *args: Any) -> None:
+    """Emit debug logs only when ATP_SOLANA_DEBUG=true."""
+    if _dbg_enabled():
+        logger.debug(msg, *args)
+
+
+def _type_name(v: Any) -> str:
+    try:
+        return type(v).__name__
+    except Exception:
+        return "<unknown>"
+
+
 def _as_dict(obj: Any) -> Any:
     """Best-effort conversion of solana-py response objects into plain dicts."""
     if obj is None:
@@ -243,6 +260,14 @@ async def verify_solana_transaction(
         # - sig_rpc: solders Signature for solana-py builds that require it
         sig_str = _signature_str(sig)
         sig_rpc: Any = _coerce_signature(sig_str) or sig_str
+        _dbg(
+            "verify_solana_transaction start: sig_str={} sig_type={} sig_rpc_type={} commitment={} token={}",
+            sig_str,
+            _type_name(sig),
+            _type_name(sig_rpc),
+            commitment,
+            getattr(payment_token, "value", payment_token),
+        )
 
         def _normalize_confirmation_status(status: Any) -> Optional[str]:
             """
@@ -302,6 +327,12 @@ async def verify_solana_transaction(
                     st = await client.get_signature_statuses([sig_rpc])
                 except TypeError:
                     st = await client.get_signature_statuses([sig_str])
+                _dbg(
+                    "get_signature_statuses: sig_rpc_type={} resp_type={} resp={}",
+                    _type_name(sig_rpc),
+                    _type_name(st),
+                    _as_dict(st),
+                )
                 if st.value and st.value[0] is not None:
                     if st.value[0].err:
                         return False, "Transaction failed on-chain."
@@ -313,18 +344,40 @@ async def verify_solana_transaction(
                         last_status = st.value[0].get("confirmationStatus") or st.value[0].get(
                             "confirmation_status"
                         )
+                    _dbg(
+                        "signature status row: row_type={} confirmation_status={} normalized_ok={}",
+                        _type_name(st.value[0]),
+                        last_status,
+                        _commitment_ok(last_status or "confirmed"),
+                    )
 
                 # Try to fetch tx details; prefer jsonParsed, but fall back if unsupported.
                 try:
                     tx_details = await client.get_transaction(
-                        sig_str,
+                        sig_rpc,
                         encoding="jsonParsed",
                         max_supported_transaction_version=0,
                     )
                 except TypeError:
-                    tx_details = await client.get_transaction(
-                        sig_str, max_supported_transaction_version=0
-                    )
+                    # Some solana-py versions expect a string signature and/or don't support encoding kwarg.
+                    try:
+                        tx_details = await client.get_transaction(
+                            sig_str,
+                            encoding="jsonParsed",
+                            max_supported_transaction_version=0,
+                        )
+                    except TypeError:
+                        tx_details = await client.get_transaction(
+                            sig_str, max_supported_transaction_version=0
+                        )
+                _dbg(
+                    "get_transaction: sig_str={} resp_type={} resp_keys={}",
+                    sig_str,
+                    _type_name(tx_details),
+                    list(_unwrap_get_transaction_response(tx_details).keys())
+                    if _unwrap_get_transaction_response(tx_details)
+                    else None,
+                )
 
                 tx = _unwrap_get_transaction_response(tx_details)
                 if tx and _commitment_ok(last_status or "confirmed"):
@@ -514,6 +567,14 @@ async def send_and_confirm_sol_payment(
 
     try:
         recipient = Pubkey.from_string(recipient_pubkey_str)
+        _dbg(
+            "send_and_confirm_sol_payment start: payer_pubkey={} recipient={} lamports={} skip_preflight={} commitment={}",
+            str(payer.pubkey()),
+            recipient_pubkey_str,
+            lamports,
+            skip_preflight,
+            commitment,
+        )
         ix = transfer(
             TransferParams(
                 from_pubkey=payer.pubkey(), to_pubkey=recipient, lamports=lamports
@@ -530,10 +591,17 @@ async def send_and_confirm_sol_payment(
             else:
                 value = getattr(latest, "value", None)
                 blockhash_val = getattr(value, "blockhash", None) if value else None
+            _dbg(
+                "get_latest_blockhash: resp_type={} blockhash_val_type={} blockhash_val={}",
+                _type_name(latest),
+                _type_name(blockhash_val),
+                blockhash_val,
+            )
 
             recent_blockhash = _coerce_blockhash(blockhash_val)
             if not recent_blockhash:
                 raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
+            _dbg("recent_blockhash coerced: type={} value={}", _type_name(recent_blockhash), recent_blockhash)
 
             if hasattr(SoldersTransaction, "new_signed_with_payer"):
                 tx = SoldersTransaction.new_signed_with_payer(  # type: ignore[attr-defined]
@@ -557,6 +625,7 @@ async def send_and_confirm_sol_payment(
                     skip_preflight=skip_preflight, preflight_commitment=commitment
                 ),
             )
+            _dbg("send_raw_transaction: resp_type={} resp={}", _type_name(resp), _as_dict(resp))
 
             sig = (
                 resp.get("result")
@@ -569,6 +638,12 @@ async def send_and_confirm_sol_payment(
             if not sig_str:
                 raise RuntimeError(f"Failed to parse transaction signature: {sig}")
             sig_rpc: Any = _coerce_signature(sig_str) or sig_str
+            _dbg(
+                "signature parsed: sig_str={} sig_type={} sig_rpc_type={}",
+                sig_str,
+                _type_name(sig),
+                _type_name(sig_rpc),
+            )
 
             if hasattr(client, "confirm_transaction"):
                 # solana-py version differences:

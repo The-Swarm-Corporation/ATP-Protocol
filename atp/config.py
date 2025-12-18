@@ -62,3 +62,7 @@ SUPPORTED_PAYMENT_TOKENS = ["SOL", "USDC"]
 # Agent pricing configuration (host-provided)
 INPUT_COST_PER_MILLION_USD = _float_env("INPUT_COST_PER_MILLION_USD")
 OUTPUT_COST_PER_MILLION_USD = _float_env("OUTPUT_COST_PER_MILLION_USD")
+
+# Verbose Solana debug logging (server-side). Enable temporarily for diagnosing RPC type mismatches.
+# WARNING: do not enable permanently in high-traffic production environments.
+ATP_SOLANA_DEBUG = _bool_env("ATP_SOLANA_DEBUG", default=False)

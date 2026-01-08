@@ -32,16 +32,9 @@ from atp.solana_utils import (
 )
 from atp.token_prices import token_price_fetcher
 from atp.utils import calculate_payment_amounts, compute_usd_cost_from_usage
-from atp.vault import InMemoryVault, RedisVault
+from atp.vault import InMemoryVault
 
-# --- JOB VAULT INIT ---
-job_vault: Any
-if config.JOB_VAULT_BACKEND == "memory":
-    job_vault = InMemoryVault(default_ttl=config.JOB_TTL_SECONDS)
-else:
-    job_vault = RedisVault(
-        redis_url=config.REDIS_URL, default_ttl=config.JOB_TTL_SECONDS
-    )
+job_vault = InMemoryVault(default_ttl=config.JOB_TTL_SECONDS)
 
 
 # --- APP LIFECYCLE ---

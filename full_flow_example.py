@@ -11,7 +11,7 @@ IMPORTANT
 - Set ATP_ALLOW_SPEND=true to actually run the settle step.
 
 Env vars:
-- ATP_BASE_URL      (default: http://localhost:8000)
+- ATP_BASE_URL
 - ATP_USER_WALLET   (required) payer public key string
 - ATP_PRIVATE_KEY   (required) payer private key string (base58 keypair or JSON array of ints)
 - ATP_ALLOW_SPEND   (default: false) set true to run settlement (spends SOL)

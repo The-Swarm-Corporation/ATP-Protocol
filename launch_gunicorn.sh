@@ -12,7 +12,7 @@ WORKERS=$((CPU_CORES + 1))
 
 echo "CPU cores: $CPU_CORES, Using workers: $WORKERS"
 
-gunicorn atp.api:app \
+gunicorn api:app \
   --bind 0.0.0.0:8000 \
   --workers $WORKERS \
   --worker-class uvicorn.workers.UvicornWorker \

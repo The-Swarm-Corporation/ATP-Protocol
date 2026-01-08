@@ -181,11 +181,14 @@ def _signature_str(v: Any) -> str:
     return str(v).strip()
 
 
-def _token_balances_by_owner_and_mint(meta: Dict[str, Any]) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
+def _token_balances_by_owner_and_mint(
+    meta: Dict[str, Any],
+) -> Tuple[Dict[Tuple[str, str], int], Dict[Tuple[str, str], int]]:
     """
     Return (pre, post) mappings for summed SPL token balances keyed by (owner, mint),
     using raw base-unit `amount` strings from uiTokenAmount.
     """
+
     def collect(entries: Any) -> Dict[Tuple[str, str], int]:
         out: Dict[Tuple[str, str], int] = {}
         if not isinstance(entries, list):
@@ -336,14 +339,14 @@ async def verify_solana_transaction(
                 if st.value and st.value[0] is not None:
                     if st.value[0].err:
                         return False, "Transaction failed on-chain."
-                    last_status = getattr(st.value[0], "confirmation_status", None) or getattr(
-                        st.value[0], "confirmationStatus", None
-                    )
+                    last_status = getattr(
+                        st.value[0], "confirmation_status", None
+                    ) or getattr(st.value[0], "confirmationStatus", None)
                     # Some versions expose dict-like status objects
                     if isinstance(st.value[0], dict):
-                        last_status = st.value[0].get("confirmationStatus") or st.value[0].get(
-                            "confirmation_status"
-                        )
+                        last_status = st.value[0].get("confirmationStatus") or st.value[
+                            0
+                        ].get("confirmation_status")
                     _dbg(
                         "signature status row: row_type={} confirmation_status={} normalized_ok={}",
                         _type_name(st.value[0]),
@@ -374,9 +377,11 @@ async def verify_solana_transaction(
                     "get_transaction: sig_str={} resp_type={} resp_keys={}",
                     sig_str,
                     _type_name(tx_details),
-                    list(_unwrap_get_transaction_response(tx_details).keys())
-                    if _unwrap_get_transaction_response(tx_details)
-                    else None,
+                    (
+                        list(_unwrap_get_transaction_response(tx_details).keys())
+                        if _unwrap_get_transaction_response(tx_details)
+                        else None
+                    ),
                 )
 
                 tx = _unwrap_get_transaction_response(tx_details)
@@ -410,7 +415,11 @@ async def verify_solana_transaction(
                     source = info.get("source")
                     dest = info.get("destination")
                     lamports = _safe_int(info.get("lamports"))
-                    if source == sender and dest == expected_recipient and lamports == expected_amount_units:
+                    if (
+                        source == sender
+                        and dest == expected_recipient
+                        and lamports == expected_amount_units
+                    ):
                         matched = True
                         break
 
@@ -434,13 +443,21 @@ async def verify_solana_transaction(
                     sender_idx = key_strs.index(sender)
                     recipient_idx = key_strs.index(expected_recipient)
                 except ValueError:
-                    return False, "Sender/recipient not found in transaction account keys."
+                    return (
+                        False,
+                        "Sender/recipient not found in transaction account keys.",
+                    )
 
                 pre = meta.get("preBalances") or []
                 post = meta.get("postBalances") or []
                 if not (isinstance(pre, list) and isinstance(post, list)):
                     return False, "Missing balance arrays for verification."
-                if sender_idx >= len(pre) or sender_idx >= len(post) or recipient_idx >= len(pre) or recipient_idx >= len(post):
+                if (
+                    sender_idx >= len(pre)
+                    or sender_idx >= len(post)
+                    or recipient_idx >= len(pre)
+                    or recipient_idx >= len(post)
+                ):
                     return False, "Balance indices out of range."
 
                 sender_delta = _safe_int(post[sender_idx]) - _safe_int(pre[sender_idx])  # type: ignore[operator]
@@ -448,7 +465,10 @@ async def verify_solana_transaction(
                 if sender_delta is None or recipient_delta is None:
                     return False, "Unable to compute balance deltas."
 
-                if recipient_delta == expected_amount_units and sender_delta <= -expected_amount_units:
+                if (
+                    recipient_delta == expected_amount_units
+                    and sender_delta <= -expected_amount_units
+                ):
                     logger.info(
                         f"SOL payment verified (delta): sig={sig_str} sender={sender} recipient={expected_recipient} lamports={expected_amount_units}"
                     )
@@ -462,7 +482,9 @@ async def verify_solana_transaction(
             # SPL token verification (e.g., USDC)
             if not expected_recipient:
                 return False, "Missing expected_recipient (owner) for SPL verification."
-            mint = expected_mint or (config.USDC_MINT_ADDRESS if payment_token == PaymentToken.USDC else None)
+            mint = expected_mint or (
+                config.USDC_MINT_ADDRESS if payment_token == PaymentToken.USDC else None
+            )
             if not mint:
                 return False, "Missing expected_mint for SPL verification."
 
@@ -472,7 +494,10 @@ async def verify_solana_transaction(
             recipient_delta = post_map.get(rec_key, 0) - pre_map.get(rec_key, 0)
             sender_delta = post_map.get(snd_key, 0) - pre_map.get(snd_key, 0)
 
-            if recipient_delta == expected_amount_units and sender_delta <= -expected_amount_units:
+            if (
+                recipient_delta == expected_amount_units
+                and sender_delta <= -expected_amount_units
+            ):
                 logger.info(
                     f"SPL payment verified: sig={sig_str} sender={sender} owner={expected_recipient} mint={mint} amount={expected_amount_units}"
                 )
@@ -601,7 +626,11 @@ async def send_and_confirm_sol_payment(
             recent_blockhash = _coerce_blockhash(blockhash_val)
             if not recent_blockhash:
                 raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
-            _dbg("recent_blockhash coerced: type={} value={}", _type_name(recent_blockhash), recent_blockhash)
+            _dbg(
+                "recent_blockhash coerced: type={} value={}",
+                _type_name(recent_blockhash),
+                recent_blockhash,
+            )
 
             if hasattr(SoldersTransaction, "new_signed_with_payer"):
                 tx = SoldersTransaction.new_signed_with_payer(  # type: ignore[attr-defined]
@@ -625,7 +654,11 @@ async def send_and_confirm_sol_payment(
                     skip_preflight=skip_preflight, preflight_commitment=commitment
                 ),
             )
-            _dbg("send_raw_transaction: resp_type={} resp={}", _type_name(resp), _as_dict(resp))
+            _dbg(
+                "send_raw_transaction: resp_type={} resp={}",
+                _type_name(resp),
+                _as_dict(resp),
+            )
 
             sig = (
                 resp.get("result")
@@ -673,6 +706,189 @@ async def send_and_confirm_sol_payment(
             str(payer.pubkey()),
             recipient_pubkey_str,
             lamports,
+            skip_preflight,
+            commitment,
+        )
+        raise
+
+
+async def send_and_confirm_split_sol_payment(
+    *,
+    payer: Keypair,
+    treasury_pubkey_str: str,
+    recipient_pubkey_str: str,
+    treasury_lamports: int,
+    recipient_lamports: int,
+    skip_preflight: bool,
+    commitment: str,
+) -> str:
+    """Build, sign, send, and confirm a split SOL transfer (treasury fee + recipient payment).
+
+    Sends two transfers in a single atomic transaction:
+    1. Treasury receives the processing fee
+    2. Recipient receives the remainder
+
+    Args:
+        payer: solders `Keypair` that pays the lamports and signs the tx.
+        treasury_pubkey_str: Treasury pubkey (base58 string) for processing fee.
+        recipient_pubkey_str: Recipient pubkey (base58 string) for main payment.
+        treasury_lamports: Amount of SOL to send to treasury (must be >= 0).
+        recipient_lamports: Amount of SOL to send to recipient (must be > 0).
+        skip_preflight: If True, skip preflight simulation.
+        commitment: Confirmation commitment to wait for (processed|confirmed|finalized).
+
+    Returns:
+        Transaction signature (base58 string).
+
+    Raises:
+        ValueError: If recipient_lamports <= 0 or treasury_lamports < 0.
+        RuntimeError: If blockhash cannot be fetched, tx cannot be sent, or tx fails.
+    """
+    if recipient_lamports <= 0:
+        raise ValueError("recipient_lamports must be > 0")
+    if treasury_lamports < 0:
+        raise ValueError("treasury_lamports must be >= 0")
+
+    try:
+        treasury = Pubkey.from_string(treasury_pubkey_str)
+        recipient = Pubkey.from_string(recipient_pubkey_str)
+        _dbg(
+            "send_and_confirm_split_sol_payment start: payer_pubkey={} treasury={} recipient={} treasury_lamports={} recipient_lamports={} skip_preflight={} commitment={}",
+            str(payer.pubkey()),
+            treasury_pubkey_str,
+            recipient_pubkey_str,
+            treasury_lamports,
+            recipient_lamports,
+            skip_preflight,
+            commitment,
+        )
+
+        # Create transfer instructions
+        instructions = []
+        if treasury_lamports > 0:
+            instructions.append(
+                transfer(
+                    TransferParams(
+                        from_pubkey=payer.pubkey(),
+                        to_pubkey=treasury,
+                        lamports=treasury_lamports,
+                    )
+                )
+            )
+        instructions.append(
+            transfer(
+                TransferParams(
+                    from_pubkey=payer.pubkey(),
+                    to_pubkey=recipient,
+                    lamports=recipient_lamports,
+                )
+            )
+        )
+
+        async with SolanaClient(config.SOLANA_RPC_URL) as client:
+            latest = await client.get_latest_blockhash()
+            blockhash_val: Any = None
+            if isinstance(latest, dict):
+                blockhash_val = ((latest.get("result") or {}).get("value") or {}).get(
+                    "blockhash"
+                )
+            else:
+                value = getattr(latest, "value", None)
+                blockhash_val = getattr(value, "blockhash", None) if value else None
+            _dbg(
+                "get_latest_blockhash: resp_type={} blockhash_val_type={} blockhash_val={}",
+                _type_name(latest),
+                _type_name(blockhash_val),
+                blockhash_val,
+            )
+
+            recent_blockhash = _coerce_blockhash(blockhash_val)
+            if not recent_blockhash:
+                raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
+            _dbg(
+                "recent_blockhash coerced: type={} value={}",
+                _type_name(recent_blockhash),
+                recent_blockhash,
+            )
+
+            if hasattr(SoldersTransaction, "new_signed_with_payer"):
+                tx = SoldersTransaction.new_signed_with_payer(  # type: ignore[attr-defined]
+                    instructions,
+                    payer.pubkey(),
+                    [payer],
+                    recent_blockhash,
+                )
+            else:
+                from solders.message import Message
+
+                msg = Message.new_with_blockhash(
+                    instructions, payer.pubkey(), recent_blockhash
+                )
+                tx = SoldersTransaction.new_unsigned(msg)
+                tx.sign([payer], recent_blockhash)
+
+            raw_tx = tx.to_bytes() if hasattr(tx, "to_bytes") else bytes(tx)
+
+            resp = await client.send_raw_transaction(
+                raw_tx,
+                opts=TxOpts(
+                    skip_preflight=skip_preflight, preflight_commitment=commitment
+                ),
+            )
+            _dbg(
+                "send_raw_transaction: resp_type={} resp={}",
+                _type_name(resp),
+                _as_dict(resp),
+            )
+
+            sig = (
+                resp.get("result")
+                if isinstance(resp, dict)
+                else getattr(resp, "value", None) or getattr(resp, "result", None)
+            )
+            if not sig:
+                raise RuntimeError(f"Failed to send transaction: {resp}")
+            sig_str = _signature_str(sig)
+            if not sig_str:
+                raise RuntimeError(f"Failed to parse transaction signature: {sig}")
+            sig_rpc: Any = _coerce_signature(sig_str) or sig_str
+            _dbg(
+                "signature parsed: sig_str={} sig_type={} sig_rpc_type={}",
+                sig_str,
+                _type_name(sig),
+                _type_name(sig_rpc),
+            )
+
+            if hasattr(client, "confirm_transaction"):
+                # solana-py version differences:
+                # - some builds want a string signature
+                # - others want a solders `Signature`
+                try:
+                    await client.confirm_transaction(sig_rpc, commitment=commitment)  # type: ignore[arg-type]
+                except TypeError:
+                    await client.confirm_transaction(sig_str, commitment=commitment)  # type: ignore[arg-type]
+            else:
+                for _ in range(30):
+                    try:
+                        st = await client.get_signature_statuses([sig_rpc])
+                    except TypeError:
+                        st = await client.get_signature_statuses([sig_str])
+                    if st.value and st.value[0] is not None:
+                        if st.value[0].err:
+                            raise RuntimeError("Transaction failed on-chain")
+                        return sig_str
+                    await asyncio.sleep(1)
+
+            return sig_str
+    except Exception:
+        # Log full traceback with non-sensitive context. Do NOT log payer secret key.
+        logger.opt(exception=True).error(
+            "send_and_confirm_split_sol_payment failed: payer={} treasury={} recipient={} treasury_lamports={} recipient_lamports={} skip_preflight={} commitment={}",
+            str(payer.pubkey()),
+            treasury_pubkey_str,
+            recipient_pubkey_str,
+            treasury_lamports,
+            recipient_lamports,
             skip_preflight,
             commitment,
         )

@@ -77,3 +77,7 @@ class TokenPriceFetcher:
 
 
 token_price_fetcher = TokenPriceFetcher()
+
+
+# if __name__ == "__main__":
+#     print(asyncio.run(token_price_fetcher.get_price_usd("SOL")))

@@ -1,84 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Any, Dict, Optional
 
-import redis.asyncio as redis
 from loguru import logger
-
-
-class RedisVault:
-    """Distributed job vault using Redis with automatic TTL expiration."""
-
-    def __init__(self, redis_url: str, default_ttl: int = 600):
-        self.redis_url = redis_url
-        self.default_ttl = default_ttl
-        self._client: Optional[redis.Redis] = None
-        self._prefix = "atp:job:"
-
-    async def connect(self) -> None:
-        """Establish connection to Redis."""
-        self._client = redis.from_url(
-            self.redis_url,
-            encoding="utf-8",
-            decode_responses=True,
-        )
-        await self._client.ping()
-        logger.info(f"Connected to Redis at {self.redis_url}")
-
-    async def disconnect(self) -> None:
-        """Close Redis connection."""
-        if self._client:
-            await self._client.close()
-            logger.info("Disconnected from Redis")
-
-    async def store(
-        self, job_id: str, data: Dict[str, Any], ttl: Optional[int] = None
-    ) -> None:
-        """Store job data with TTL expiration."""
-        if not self._client:
-            raise RuntimeError("Redis client not connected")
-
-        key = f"{self._prefix}{job_id}"
-        ttl = ttl or self.default_ttl
-        serialized = json.dumps(data)
-        await self._client.setex(key, ttl, serialized)
-
-    async def retrieve(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve job data by ID."""
-        if not self._client:
-            raise RuntimeError("Redis client not connected")
-
-        key = f"{self._prefix}{job_id}"
-        data = await self._client.get(key)
-        if data:
-            return json.loads(data)
-        return None
-
-    async def delete(self, job_id: str) -> bool:
-        """Delete job data and return True if it existed."""
-        if not self._client:
-            raise RuntimeError("Redis client not connected")
-
-        key = f"{self._prefix}{job_id}"
-        result = await self._client.delete(key)
-        return result > 0
-
-    async def pop(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve and delete job data atomically."""
-        if not self._client:
-            raise RuntimeError("Redis client not connected")
-
-        key = f"{self._prefix}{job_id}"
-        pipe = self._client.pipeline()
-        pipe.get(key)
-        pipe.delete(key)
-        results = await pipe.execute()
-
-        if results[0]:
-            return json.loads(results[0])
-        return None
 
 
 class InMemoryVault:

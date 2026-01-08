@@ -30,7 +30,10 @@ from atp.solana_utils import (
     verify_solana_transaction,
 )
 from atp.token_prices import token_price_fetcher
-from atp.utils import calculate_payment_amounts, compute_usd_cost_from_usage
+from atp.utils import (
+    calculate_payment_amounts,
+    compute_usd_cost_from_usage,
+)
 from atp.vault import InMemoryVault
 
 job_vault = InMemoryVault(default_ttl=config.JOB_TTL_SECONDS)
@@ -71,7 +74,9 @@ async def health_check():
     return {"status": "healthy", "service": "ATP Protocol Gateway"}
 
 
-@app.post("/v1/agent/trade", status_code=status.HTTP_402_PAYMENT_REQUIRED)
+@app.post(
+    "/v1/agent/trade", status_code=status.HTTP_402_PAYMENT_REQUIRED
+)
 async def create_agent_trade(request: AgentTask):
     """Execute the upstream agent and return a payment challenge (HTTP 402).
 
@@ -95,7 +100,9 @@ async def create_agent_trade(request: AgentTask):
     - AGENT_TREASURY_PUBKEY must be set.
     """
     if not config.AGENT_TREASURY_PUBKEY:
-        raise HTTPException(status_code=500, detail="Treasury not configured")
+        raise HTTPException(
+            status_code=500, detail="Treasury not configured"
+        )
 
     logger.info(
         f"Processing trade request for agent: {request.agent_config.agent_name}"
@@ -108,7 +115,9 @@ async def create_agent_trade(request: AgentTask):
 
     # Execute Swarms Agent
     async with httpx.AsyncClient() as client:
-        agent_config_dict = request.agent_config.model_dump(exclude_none=True)
+        agent_config_dict = request.agent_config.model_dump(
+            exclude_none=True
+        )
         payload: Dict[str, Any] = {
             "agent_config": agent_config_dict,
             "task": request.task,
@@ -126,7 +135,10 @@ async def create_agent_trade(request: AgentTask):
         }
         try:
             swarms_resp = await client.post(
-                config.SWARMS_API_URL, json=payload, headers=headers, timeout=120.0
+                config.SWARMS_API_URL,
+                json=payload,
+                headers=headers,
+                timeout=120.0,
             )
             if swarms_resp.status_code != 200:
                 raise HTTPException(
@@ -135,10 +147,13 @@ async def create_agent_trade(request: AgentTask):
                 )
             data = swarms_resp.json()
         except httpx.TimeoutException:
-            raise HTTPException(status_code=504, detail="Agent execution timed out")
+            raise HTTPException(
+                status_code=504, detail="Agent execution timed out"
+            )
         except httpx.RequestError:
             raise HTTPException(
-                status_code=502, detail="Failed to connect to agent service"
+                status_code=502,
+                detail="Failed to connect to agent service",
             )
 
     usage = data.get("usage") or {}
@@ -162,7 +177,9 @@ async def create_agent_trade(request: AgentTask):
         "payment_token": request.payment_token.value,
     }
 
-    await job_vault.store(job_id, job_data, ttl=config.JOB_TTL_SECONDS)
+    await job_vault.store(
+        job_id, job_data, ttl=config.JOB_TTL_SECONDS
+    )
 
     if request.payment_token == PaymentToken.SOL:
         unit_name = "lamports"
@@ -179,21 +196,36 @@ async def create_agent_trade(request: AgentTask):
             "pricing": pricing,
             "payment": {
                 "description": "Send payment to the agent treasury. A 5% settlement fee will be automatically deducted.",
-                f"amount_{unit_name}": payment_amounts["total_amount_units"],
-                f"amount_{token_key}": payment_amounts["total_amount_token"],
+                f"amount_{unit_name}": payment_amounts[
+                    "total_amount_units"
+                ],
+                f"amount_{token_key}": payment_amounts[
+                    "total_amount_token"
+                ],
                 "amount_usd": usd_cost,
                 "recipient": config.AGENT_TREASURY_PUBKEY,
                 "memo": f"ATP:{job_id}",
             },
             "fee_breakdown": {
-                "settlement_fee_percent": payment_amounts["fee_percent"],
-                f"fee_{unit_name}": payment_amounts["fee_amount_units"],
-                f"fee_{token_key}": payment_amounts["fee_amount_token"],
+                "settlement_fee_percent": payment_amounts[
+                    "fee_percent"
+                ],
+                f"fee_{unit_name}": payment_amounts[
+                    "fee_amount_units"
+                ],
+                f"fee_{token_key}": payment_amounts[
+                    "fee_amount_token"
+                ],
                 "fee_usd": usd_cost * config.SETTLEMENT_FEE_PERCENT,
                 "fee_recipient": config.SWARMS_TREASURY_PUBKEY,
-                f"agent_receives_{unit_name}": payment_amounts["agent_amount_units"],
-                f"agent_receives_{token_key}": payment_amounts["agent_amount_token"],
-                "agent_receives_usd": usd_cost * (1 - config.SETTLEMENT_FEE_PERCENT),
+                f"agent_receives_{unit_name}": payment_amounts[
+                    "agent_amount_units"
+                ],
+                f"agent_receives_{token_key}": payment_amounts[
+                    "agent_amount_token"
+                ],
+                "agent_receives_usd": usd_cost
+                * (1 - config.SETTLEMENT_FEE_PERCENT),
             },
             "token_price_usd": token_price_usd,
             "usdc_mint": (
@@ -243,7 +275,9 @@ async def settle_agent_trade(request: SettleTrade):
     try:
         payer = parse_keypair_from_string(request.private_key)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid private_key: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid private_key: {str(e)}"
+        )
 
     payer_pubkey_str = str(payer.pubkey())
     expected_sender = job.get("sender")
@@ -277,13 +311,15 @@ async def settle_agent_trade(request: SettleTrade):
     )
     if not is_valid:
         raise HTTPException(
-            status_code=400, detail=f"Payment verification failed: {msg}"
+            status_code=400,
+            detail=f"Payment verification failed: {msg}",
         )
 
     final_output = await job_vault.pop(request.job_id)
     if not final_output:
         raise HTTPException(
-            status_code=409, detail="Trade was already settled or expired"
+            status_code=409,
+            detail="Trade was already settled or expired",
         )
 
     return {
@@ -314,7 +350,11 @@ async def get_token_price(token: str = "SOL"):
         "token": token_upper,
         "price_usd": price,
         "source": "coingecko" if token_upper == "SOL" else "pegged",
-        "mint_address": config.USDC_MINT_ADDRESS if token_upper == "USDC" else None,
+        "mint_address": (
+            config.USDC_MINT_ADDRESS
+            if token_upper == "USDC"
+            else None
+        ),
     }
 
 
@@ -322,7 +362,11 @@ async def get_token_price(token: str = "SOL"):
 async def get_sol_price():
     """Legacy endpoint: Get current SOL price in USD."""
     price = await token_price_fetcher.get_sol_price_usd()
-    return {"currency": "SOL", "price_usd": price, "source": "coingecko"}
+    return {
+        "currency": "SOL",
+        "price_usd": price,
+        "source": "coingecko",
+    }
 
 
 @app.get("/v1/payment/info")

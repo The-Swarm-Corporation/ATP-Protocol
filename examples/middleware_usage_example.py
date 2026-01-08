@@ -84,7 +84,9 @@ API_KEY_TO_WALLET = {
 }
 
 
-def get_wallet_from_api_key(api_key: str = Header(..., alias="x-api-key")) -> str:
+def get_wallet_from_api_key(
+    api_key: str = Header(..., alias="x-api-key")
+) -> str:
     """Custom dependency to map API keys to wallet private keys."""
     if api_key not in API_KEY_TO_WALLET:
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -93,7 +95,8 @@ def get_wallet_from_api_key(api_key: str = Header(..., alias="x-api-key")) -> st
 
 @app.post("/v1/chat-with-api-key")
 async def chat_with_api_key(
-    request: dict, wallet_private_key: str = Depends(get_wallet_from_api_key)
+    request: dict,
+    wallet_private_key: str = Depends(get_wallet_from_api_key),
 ):
     """Example endpoint with custom API key handling.
 

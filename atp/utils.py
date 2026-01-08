@@ -7,7 +7,9 @@ from atp.schemas import PaymentToken
 
 
 def calculate_payment_amounts(
-    usd_cost: float, token_price_usd: float, payment_token: PaymentToken
+    usd_cost: float,
+    token_price_usd: float,
+    payment_token: PaymentToken,
 ) -> Dict[str, Any]:
     """
     Calculate payment amounts with settlement fee taken from the total.
@@ -15,10 +17,16 @@ def calculate_payment_amounts(
     Returns amounts in the smallest unit (lamports for SOL, micro-units for USDC).
     """
     total_amount_token = usd_cost / token_price_usd
-    fee_amount_token = total_amount_token * config.SETTLEMENT_FEE_PERCENT
+    fee_amount_token = (
+        total_amount_token * config.SETTLEMENT_FEE_PERCENT
+    )
     agent_amount_token = total_amount_token - fee_amount_token
 
-    decimals = 9 if payment_token == PaymentToken.SOL else config.USDC_DECIMALS
+    decimals = (
+        9
+        if payment_token == PaymentToken.SOL
+        else config.USDC_DECIMALS
+    )
 
     total_amount_units = int(total_amount_token * 10**decimals)
     fee_amount_units = int(fee_amount_token * 10**decimals)
@@ -56,7 +64,9 @@ def _safe_int(v: Any) -> Optional[int]:
     return None
 
 
-def extract_usage_token_counts(usage: Any) -> Dict[str, Optional[int]]:
+def extract_usage_token_counts(
+    usage: Any,
+) -> Dict[str, Optional[int]]:
     """
     Normalize token counts from various possible upstream shapes.
     Common keys:
@@ -64,7 +74,11 @@ def extract_usage_token_counts(usage: Any) -> Dict[str, Optional[int]]:
     - input_tokens / output_tokens / total_tokens
     """
     if not isinstance(usage, dict):
-        return {"input_tokens": None, "output_tokens": None, "total_tokens": None}
+        return {
+            "input_tokens": None,
+            "output_tokens": None,
+            "total_tokens": None,
+        }
 
     input_tokens = _safe_int(usage.get("input_tokens"))
     if input_tokens is None:
@@ -75,7 +89,11 @@ def extract_usage_token_counts(usage: Any) -> Dict[str, Optional[int]]:
         output_tokens = _safe_int(usage.get("completion_tokens"))
 
     total_tokens = _safe_int(usage.get("total_tokens"))
-    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+    if (
+        total_tokens is None
+        and input_tokens is not None
+        and output_tokens is not None
+    ):
         total_tokens = input_tokens + output_tokens
 
     return {

@@ -42,7 +42,9 @@ def _pretty(obj: Any, limit: int = 12000) -> str:
         s = json.dumps(obj, indent=2, sort_keys=False)
     except Exception:
         s = str(obj)
-    return s if len(s) <= limit else s[:limit] + "\n... (truncated) ..."
+    return (
+        s if len(s) <= limit else s[:limit] + "\n... (truncated) ..."
+    )
 
 
 def _print_section(title: str) -> None:
@@ -52,7 +54,8 @@ def _print_section(title: str) -> None:
 
 def main() -> int:
     base_url = os.getenv(
-        "ATP_BASE_URL", "https://atp-protocol-production.up.railway.app"
+        "ATP_BASE_URL",
+        "https://atp-protocol-production.up.railway.app",
     ).rstrip("/")
     user_wallet = (os.getenv("ATP_USER_WALLET") or "").strip()
     private_key = (os.getenv("ATP_PRIVATE_KEY") or "").strip()
@@ -80,7 +83,10 @@ def main() -> int:
         _print_section("0) GET /health")
         health = client.get("/health")
         print("status:", health.status_code)
-        print("body:", _pretty(health.json() if health.content else health.text))
+        print(
+            "body:",
+            _pretty(health.json() if health.content else health.text),
+        )
         health.raise_for_status()
 
         # 1) Trade (expects 402 Payment Required)
@@ -114,7 +120,9 @@ def main() -> int:
         challenge = trade_json
         job_id = challenge.get("job_id")
         if not job_id:
-            raise RuntimeError(f"Missing job_id in 402 response: {challenge}")
+            raise RuntimeError(
+                f"Missing job_id in 402 response: {challenge}"
+            )
 
         _print_section("402 CHALLENGE SUMMARY")
         print("job_id:", job_id)
@@ -124,7 +132,9 @@ def main() -> int:
         if isinstance(challenge.get("payment"), dict):
             print("payment:", _pretty(challenge["payment"]))
         if isinstance(challenge.get("fee_breakdown"), dict):
-            print("fee_breakdown:", _pretty(challenge["fee_breakdown"]))
+            print(
+                "fee_breakdown:", _pretty(challenge["fee_breakdown"])
+            )
         print("ttl_seconds:", challenge.get("ttl_seconds"))
         print("instruction:", challenge.get("instruction"))
 

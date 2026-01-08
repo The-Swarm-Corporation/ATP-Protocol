@@ -32,7 +32,9 @@ import httpx
 
 
 if __name__ == "__main__":
-    base_url = os.getenv("ATP_BASE_URL", "http://localhost:8000").rstrip("/")
+    base_url = os.getenv(
+        "ATP_BASE_URL", "http://localhost:8000"
+    ).rstrip("/")
     user_wallet = os.getenv("ATP_USER_WALLET")
     token = os.getenv("ATP_PAYMENT_TOKEN", "SOL").upper()
     task = os.getenv(
@@ -41,7 +43,9 @@ if __name__ == "__main__":
     )
     private_key = os.getenv("ATP_PRIVATE_KEY")
     job_id = os.getenv("ATP_JOB_ID")
-    output_path = os.getenv("ATP_OUTPUT_PATH", "examples/client_smoke_test_output.json")
+    output_path = os.getenv(
+        "ATP_OUTPUT_PATH", "examples/client_smoke_test_output.json"
+    )
 
     if not user_wallet:
         raise RuntimeError("ATP_USER_WALLET is required")
@@ -100,7 +104,10 @@ if __name__ == "__main__":
                 "ATP_JOB_ID not provided and no job_id returned by /v1/agent/trade"
             )
 
-        settle_payload = {"job_id": resolved_job_id, "private_key": private_key}
+        settle_payload = {
+            "job_id": resolved_job_id,
+            "private_key": private_key,
+        }
         settle = client.post("/v1/agent/settle", json=settle_payload)
         settle.raise_for_status()
         results["settlement_200"] = settle.json()

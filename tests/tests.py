@@ -70,7 +70,11 @@ def _int_env(name: str, default: int) -> int:
 # Initialize all configurable values up-front so the rest of the file only
 # references these module-level variables.
 ATP_BASE_URL: str = (
-    _env("ATP_BASE_URL", "https://atp-protocol-production.up.railway.app") or ""
+    _env(
+        "ATP_BASE_URL",
+        "https://atp-protocol-production.up.railway.app",
+    )
+    or ""
 ).rstrip("/")
 
 # Optional full trade -> settle flow controls
@@ -85,7 +89,9 @@ def check(cond: bool, msg: str) -> None:
         raise AssertionError(msg)
 
 
-def must_status(resp: httpx.Response, expected: int) -> Dict[str, Any]:
+def must_status(
+    resp: httpx.Response, expected: int
+) -> Dict[str, Any]:
     check(
         resp.status_code == expected,
         f"Expected HTTP {expected}, got {resp.status_code}: {resp.text}",
@@ -105,26 +111,45 @@ def pretty(obj: Any) -> str:
 def test_health(client: httpx.Client) -> None:
     r = client.get("/health")
     data = must_status(r, 200)
-    check(data.get("status") == "healthy", f"/health unexpected: {pretty(data)}")
+    check(
+        data.get("status") == "healthy",
+        f"/health unexpected: {pretty(data)}",
+    )
 
 
 def test_token_price_and_payment_info(client: httpx.Client) -> None:
     # payment info
     info = must_status(client.get("/v1/payment/info"), 200)
-    check("supported_tokens" in info, f"missing supported_tokens: {pretty(info)}")
-    check("current_prices" in info, f"missing current_prices: {pretty(info)}")
+    check(
+        "supported_tokens" in info,
+        f"missing supported_tokens: {pretty(info)}",
+    )
+    check(
+        "current_prices" in info,
+        f"missing current_prices: {pretty(info)}",
+    )
 
     # token price: SOL
     sol = must_status(client.get("/v1/token/price/SOL"), 200)
-    check(sol.get("token") == "SOL", f"bad SOL token price: {pretty(sol)}")
     check(
-        isinstance(sol.get("price_usd"), (int, float)), f"bad price_usd: {pretty(sol)}"
+        sol.get("token") == "SOL",
+        f"bad SOL token price: {pretty(sol)}",
+    )
+    check(
+        isinstance(sol.get("price_usd"), (int, float)),
+        f"bad price_usd: {pretty(sol)}",
     )
 
     # token price: USDC (pegged)
     usdc = must_status(client.get("/v1/token/price/USDC"), 200)
-    check(usdc.get("token") == "USDC", f"bad USDC token price: {pretty(usdc)}")
-    check(usdc.get("price_usd") == 1.0, f"USDC not pegged: {pretty(usdc)}")
+    check(
+        usdc.get("token") == "USDC",
+        f"bad USDC token price: {pretty(usdc)}",
+    )
+    check(
+        usdc.get("price_usd") == 1.0,
+        f"USDC not pegged: {pretty(usdc)}",
+    )
 
     # invalid token
     bad = client.get("/v1/token/price/NOPE")
@@ -135,13 +160,17 @@ def test_token_price_and_payment_info(client: httpx.Client) -> None:
 
     # legacy endpoint
     legacy = must_status(client.get("/v1/sol/price"), 200)
-    check(legacy.get("currency") == "SOL", f"bad legacy response: {pretty(legacy)}")
+    check(
+        legacy.get("currency") == "SOL",
+        f"bad legacy response: {pretty(legacy)}",
+    )
 
 
 def test_settle_negative_cases(client: httpx.Client) -> None:
     # invalid job id
     r = client.post(
-        "/v1/agent/settle", json={"job_id": "not-a-real-job", "private_key": "[1]"}
+        "/v1/agent/settle",
+        json={"job_id": "not-a-real-job", "private_key": "[1]"},
     )
     check(
         r.status_code in {400, 404},
@@ -186,7 +215,8 @@ def maybe_trade_and_settle(client: httpx.Client) -> None:
     payment = data.get("payment") or {}
     lamports = payment.get("amount_lamports")
     check(
-        isinstance(lamports, int), f"Expected integer amount_lamports: {pretty(data)}"
+        isinstance(lamports, int),
+        f"Expected integer amount_lamports: {pretty(data)}",
     )
     check(lamports > 0, f"Expected lamports > 0: {lamports}")
     check(
@@ -200,7 +230,9 @@ def maybe_trade_and_settle(client: httpx.Client) -> None:
         )
         return
     if not ATP_PRIVATE_KEY:
-        raise RuntimeError("ATP_PRIVATE_KEY is required when ATP_ALLOW_SPEND=true")
+        raise RuntimeError(
+            "ATP_PRIVATE_KEY is required when ATP_ALLOW_SPEND=true"
+        )
 
     # Signed settle (expects 200)
     settle_payload = {
@@ -209,11 +241,22 @@ def maybe_trade_and_settle(client: httpx.Client) -> None:
         "skip_preflight": False,
         "commitment": "confirmed",
     }
-    st = client.post("/v1/agent/settle", json=settle_payload, timeout=600.0)
+    st = client.post(
+        "/v1/agent/settle", json=settle_payload, timeout=600.0
+    )
     out = must_status(st, 200)
-    check(out.get("status") == "success", f"Bad settle response: {pretty(out)}")
-    check(out.get("tx_signature"), f"Missing tx_signature: {pretty(out)}")
-    check(out.get("agent_output") is not None, f"Missing agent_output: {pretty(out)}")
+    check(
+        out.get("status") == "success",
+        f"Bad settle response: {pretty(out)}",
+    )
+    check(
+        out.get("tx_signature"),
+        f"Missing tx_signature: {pretty(out)}",
+    )
+    check(
+        out.get("agent_output") is not None,
+        f"Missing agent_output: {pretty(out)}",
+    )
 
 
 def main() -> int:

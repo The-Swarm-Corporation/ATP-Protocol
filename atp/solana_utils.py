@@ -67,7 +67,9 @@ def _as_dict(obj: Any) -> Any:
     return d if isinstance(d, dict) else obj
 
 
-def _unwrap_get_transaction_response(resp: Any) -> Optional[Dict[str, Any]]:
+def _unwrap_get_transaction_response(
+    resp: Any,
+) -> Optional[Dict[str, Any]]:
     """Extract the transaction payload from various solana-py response shapes."""
     if resp is None:
         return None
@@ -97,7 +99,9 @@ def _unwrap_get_transaction_response(resp: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _iter_instructions_json_parsed(tx: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
+def _iter_instructions_json_parsed(
+    tx: Dict[str, Any],
+) -> Iterable[Dict[str, Any]]:
     """
     Iterate over instructions and inner instructions from a jsonParsed transaction payload.
     """
@@ -200,7 +204,9 @@ def _token_balances_by_owner_and_mint(
             mint = e.get("mint")
             ui = e.get("uiTokenAmount") or {}
             amount_str = ui.get("amount")
-            if not isinstance(owner, str) or not isinstance(mint, str):
+            if not isinstance(owner, str) or not isinstance(
+                mint, str
+            ):
                 continue
             amt = _safe_int(amount_str)
             if amt is None:
@@ -272,7 +278,9 @@ async def verify_solana_transaction(
             getattr(payment_token, "value", payment_token),
         )
 
-        def _normalize_confirmation_status(status: Any) -> Optional[str]:
+        def _normalize_confirmation_status(
+            status: Any,
+        ) -> Optional[str]:
             """
             Normalize various confirmation status shapes into one of:
             processed | confirmed | finalized
@@ -313,7 +321,10 @@ async def verify_solana_transaction(
             normalized = _normalize_confirmation_status(status)
             if not normalized:
                 return False
-            want = _normalize_confirmation_status(commitment) or "confirmed"
+            want = (
+                _normalize_confirmation_status(commitment)
+                or "confirmed"
+            )
             rank = {"processed": 1, "confirmed": 2, "finalized": 3}
             return rank.get(normalized, 0) >= rank.get(want, 2)
 
@@ -327,9 +338,13 @@ async def verify_solana_transaction(
             deadline = time.time() + max_wait_seconds
             while time.time() < deadline:
                 try:
-                    st = await client.get_signature_statuses([sig_rpc])
+                    st = await client.get_signature_statuses(
+                        [sig_rpc]
+                    )
                 except TypeError:
-                    st = await client.get_signature_statuses([sig_str])
+                    st = await client.get_signature_statuses(
+                        [sig_str]
+                    )
                 _dbg(
                     "get_signature_statuses: sig_rpc_type={} resp_type={} resp={}",
                     _type_name(sig_rpc),
@@ -341,12 +356,14 @@ async def verify_solana_transaction(
                         return False, "Transaction failed on-chain."
                     last_status = getattr(
                         st.value[0], "confirmation_status", None
-                    ) or getattr(st.value[0], "confirmationStatus", None)
+                    ) or getattr(
+                        st.value[0], "confirmationStatus", None
+                    )
                     # Some versions expose dict-like status objects
                     if isinstance(st.value[0], dict):
-                        last_status = st.value[0].get("confirmationStatus") or st.value[
-                            0
-                        ].get("confirmation_status")
+                        last_status = st.value[0].get(
+                            "confirmationStatus"
+                        ) or st.value[0].get("confirmation_status")
                     _dbg(
                         "signature status row: row_type={} confirmation_status={} normalized_ok={}",
                         _type_name(st.value[0]),
@@ -371,15 +388,22 @@ async def verify_solana_transaction(
                         )
                     except TypeError:
                         tx_details = await client.get_transaction(
-                            sig_str, max_supported_transaction_version=0
+                            sig_str,
+                            max_supported_transaction_version=0,
                         )
                 _dbg(
                     "get_transaction: sig_str={} resp_type={} resp_keys={}",
                     sig_str,
                     _type_name(tx_details),
                     (
-                        list(_unwrap_get_transaction_response(tx_details).keys())
-                        if _unwrap_get_transaction_response(tx_details)
+                        list(
+                            _unwrap_get_transaction_response(
+                                tx_details
+                            ).keys()
+                        )
+                        if _unwrap_get_transaction_response(
+                            tx_details
+                        )
                         else None
                     ),
                 )
@@ -399,12 +423,17 @@ async def verify_solana_transaction(
 
             if payment_token == PaymentToken.SOL:
                 if not expected_recipient:
-                    return False, "Missing expected_recipient for SOL verification."
+                    return (
+                        False,
+                        "Missing expected_recipient for SOL verification.",
+                    )
 
                 # Prefer instruction parsing (most precise)
                 matched = False
                 for ix in _iter_instructions_json_parsed(tx):
-                    if (ix.get("program") or ix.get("programId")) not in {"system"}:
+                    if (
+                        ix.get("program") or ix.get("programId")
+                    ) not in {"system"}:
                         continue
                     parsed = ix.get("parsed")
                     if not isinstance(parsed, dict):
@@ -430,14 +459,18 @@ async def verify_solana_transaction(
                     return True, "Verified"
 
                 # Fallback: balance delta check (less precise but still strong for simple transfers)
-                msg = (tx.get("transaction") or {}).get("message") or {}
+                msg = (tx.get("transaction") or {}).get(
+                    "message"
+                ) or {}
                 keys: List[Any] = msg.get("accountKeys") or []
                 # accountKeys may be list[str] or list[dict{pubkey:...}]
                 key_strs: List[str] = []
                 for k in keys:
                     if isinstance(k, str):
                         key_strs.append(k)
-                    elif isinstance(k, dict) and isinstance(k.get("pubkey"), str):
+                    elif isinstance(k, dict) and isinstance(
+                        k.get("pubkey"), str
+                    ):
                         key_strs.append(k["pubkey"])
                 try:
                     sender_idx = key_strs.index(sender)
@@ -450,8 +483,13 @@ async def verify_solana_transaction(
 
                 pre = meta.get("preBalances") or []
                 post = meta.get("postBalances") or []
-                if not (isinstance(pre, list) and isinstance(post, list)):
-                    return False, "Missing balance arrays for verification."
+                if not (
+                    isinstance(pre, list) and isinstance(post, list)
+                ):
+                    return (
+                        False,
+                        "Missing balance arrays for verification.",
+                    )
                 if (
                     sender_idx >= len(pre)
                     or sender_idx >= len(post)
@@ -481,18 +519,32 @@ async def verify_solana_transaction(
 
             # SPL token verification (e.g., USDC)
             if not expected_recipient:
-                return False, "Missing expected_recipient (owner) for SPL verification."
+                return (
+                    False,
+                    "Missing expected_recipient (owner) for SPL verification.",
+                )
             mint = expected_mint or (
-                config.USDC_MINT_ADDRESS if payment_token == PaymentToken.USDC else None
+                config.USDC_MINT_ADDRESS
+                if payment_token == PaymentToken.USDC
+                else None
             )
             if not mint:
-                return False, "Missing expected_mint for SPL verification."
+                return (
+                    False,
+                    "Missing expected_mint for SPL verification.",
+                )
 
-            pre_map, post_map = _token_balances_by_owner_and_mint(meta)
+            pre_map, post_map = _token_balances_by_owner_and_mint(
+                meta
+            )
             rec_key = (expected_recipient, mint)
             snd_key = (sender, mint)
-            recipient_delta = post_map.get(rec_key, 0) - pre_map.get(rec_key, 0)
-            sender_delta = post_map.get(snd_key, 0) - pre_map.get(snd_key, 0)
+            recipient_delta = post_map.get(rec_key, 0) - pre_map.get(
+                rec_key, 0
+            )
+            sender_delta = post_map.get(snd_key, 0) - pre_map.get(
+                snd_key, 0
+            )
 
             if (
                 recipient_delta == expected_amount_units
@@ -546,8 +598,12 @@ def parse_keypair_from_string(private_key_str: str) -> Keypair:
 
         if s.startswith("["):
             arr = json.loads(s)
-            if not isinstance(arr, list) or not all(isinstance(x, int) for x in arr):
-                raise ValueError("Invalid JSON private key; expected a list of ints")
+            if not isinstance(arr, list) or not all(
+                isinstance(x, int) for x in arr
+            ):
+                raise ValueError(
+                    "Invalid JSON private key; expected a list of ints"
+                )
             key_bytes = bytes(arr)
             return Keypair.from_bytes(key_bytes)
 
@@ -559,7 +615,9 @@ def parse_keypair_from_string(private_key_str: str) -> Keypair:
         )
     except Exception:
         # Never log the key itself. Just log that parsing failed.
-        logger.opt(exception=True).error("parse_keypair_from_string failed")
+        logger.opt(exception=True).error(
+            "parse_keypair_from_string failed"
+        )
         raise
 
 
@@ -602,7 +660,9 @@ async def send_and_confirm_sol_payment(
         )
         ix = transfer(
             TransferParams(
-                from_pubkey=payer.pubkey(), to_pubkey=recipient, lamports=lamports
+                from_pubkey=payer.pubkey(),
+                to_pubkey=recipient,
+                lamports=lamports,
             )
         )
 
@@ -610,12 +670,16 @@ async def send_and_confirm_sol_payment(
             latest = await client.get_latest_blockhash()
             blockhash_val: Any = None
             if isinstance(latest, dict):
-                blockhash_val = ((latest.get("result") or {}).get("value") or {}).get(
-                    "blockhash"
-                )
+                blockhash_val = (
+                    (latest.get("result") or {}).get("value") or {}
+                ).get("blockhash")
             else:
                 value = getattr(latest, "value", None)
-                blockhash_val = getattr(value, "blockhash", None) if value else None
+                blockhash_val = (
+                    getattr(value, "blockhash", None)
+                    if value
+                    else None
+                )
             _dbg(
                 "get_latest_blockhash: resp_type={} blockhash_val_type={} blockhash_val={}",
                 _type_name(latest),
@@ -625,7 +689,9 @@ async def send_and_confirm_sol_payment(
 
             recent_blockhash = _coerce_blockhash(blockhash_val)
             if not recent_blockhash:
-                raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
+                raise RuntimeError(
+                    f"Could not fetch latest blockhash: {latest}"
+                )
             _dbg(
                 "recent_blockhash coerced: type={} value={}",
                 _type_name(recent_blockhash),
@@ -642,16 +708,23 @@ async def send_and_confirm_sol_payment(
             else:
                 from solders.message import Message
 
-                msg = Message.new_with_blockhash([ix], payer.pubkey(), recent_blockhash)
+                msg = Message.new_with_blockhash(
+                    [ix], payer.pubkey(), recent_blockhash
+                )
                 tx = SoldersTransaction.new_unsigned(msg)
                 tx.sign([payer], recent_blockhash)
 
-            raw_tx = tx.to_bytes() if hasattr(tx, "to_bytes") else bytes(tx)
+            raw_tx = (
+                tx.to_bytes()
+                if hasattr(tx, "to_bytes")
+                else bytes(tx)
+            )
 
             resp = await client.send_raw_transaction(
                 raw_tx,
                 opts=TxOpts(
-                    skip_preflight=skip_preflight, preflight_commitment=commitment
+                    skip_preflight=skip_preflight,
+                    preflight_commitment=commitment,
                 ),
             )
             _dbg(
@@ -663,13 +736,18 @@ async def send_and_confirm_sol_payment(
             sig = (
                 resp.get("result")
                 if isinstance(resp, dict)
-                else getattr(resp, "value", None) or getattr(resp, "result", None)
+                else getattr(resp, "value", None)
+                or getattr(resp, "result", None)
             )
             if not sig:
-                raise RuntimeError(f"Failed to send transaction: {resp}")
+                raise RuntimeError(
+                    f"Failed to send transaction: {resp}"
+                )
             sig_str = _signature_str(sig)
             if not sig_str:
-                raise RuntimeError(f"Failed to parse transaction signature: {sig}")
+                raise RuntimeError(
+                    f"Failed to parse transaction signature: {sig}"
+                )
             sig_rpc: Any = _coerce_signature(sig_str) or sig_str
             _dbg(
                 "signature parsed: sig_str={} sig_type={} sig_rpc_type={}",
@@ -689,12 +767,18 @@ async def send_and_confirm_sol_payment(
             else:
                 for _ in range(30):
                     try:
-                        st = await client.get_signature_statuses([sig_rpc])
+                        st = await client.get_signature_statuses(
+                            [sig_rpc]
+                        )
                     except TypeError:
-                        st = await client.get_signature_statuses([sig_str])
+                        st = await client.get_signature_statuses(
+                            [sig_str]
+                        )
                     if st.value and st.value[0] is not None:
                         if st.value[0].err:
-                            raise RuntimeError("Transaction failed on-chain")
+                            raise RuntimeError(
+                                "Transaction failed on-chain"
+                            )
                         return sig_str
                     await asyncio.sleep(1)
 
@@ -789,12 +873,16 @@ async def send_and_confirm_split_sol_payment(
             latest = await client.get_latest_blockhash()
             blockhash_val: Any = None
             if isinstance(latest, dict):
-                blockhash_val = ((latest.get("result") or {}).get("value") or {}).get(
-                    "blockhash"
-                )
+                blockhash_val = (
+                    (latest.get("result") or {}).get("value") or {}
+                ).get("blockhash")
             else:
                 value = getattr(latest, "value", None)
-                blockhash_val = getattr(value, "blockhash", None) if value else None
+                blockhash_val = (
+                    getattr(value, "blockhash", None)
+                    if value
+                    else None
+                )
             _dbg(
                 "get_latest_blockhash: resp_type={} blockhash_val_type={} blockhash_val={}",
                 _type_name(latest),
@@ -804,7 +892,9 @@ async def send_and_confirm_split_sol_payment(
 
             recent_blockhash = _coerce_blockhash(blockhash_val)
             if not recent_blockhash:
-                raise RuntimeError(f"Could not fetch latest blockhash: {latest}")
+                raise RuntimeError(
+                    f"Could not fetch latest blockhash: {latest}"
+                )
             _dbg(
                 "recent_blockhash coerced: type={} value={}",
                 _type_name(recent_blockhash),
@@ -827,12 +917,17 @@ async def send_and_confirm_split_sol_payment(
                 tx = SoldersTransaction.new_unsigned(msg)
                 tx.sign([payer], recent_blockhash)
 
-            raw_tx = tx.to_bytes() if hasattr(tx, "to_bytes") else bytes(tx)
+            raw_tx = (
+                tx.to_bytes()
+                if hasattr(tx, "to_bytes")
+                else bytes(tx)
+            )
 
             resp = await client.send_raw_transaction(
                 raw_tx,
                 opts=TxOpts(
-                    skip_preflight=skip_preflight, preflight_commitment=commitment
+                    skip_preflight=skip_preflight,
+                    preflight_commitment=commitment,
                 ),
             )
             _dbg(
@@ -844,13 +939,18 @@ async def send_and_confirm_split_sol_payment(
             sig = (
                 resp.get("result")
                 if isinstance(resp, dict)
-                else getattr(resp, "value", None) or getattr(resp, "result", None)
+                else getattr(resp, "value", None)
+                or getattr(resp, "result", None)
             )
             if not sig:
-                raise RuntimeError(f"Failed to send transaction: {resp}")
+                raise RuntimeError(
+                    f"Failed to send transaction: {resp}"
+                )
             sig_str = _signature_str(sig)
             if not sig_str:
-                raise RuntimeError(f"Failed to parse transaction signature: {sig}")
+                raise RuntimeError(
+                    f"Failed to parse transaction signature: {sig}"
+                )
             sig_rpc: Any = _coerce_signature(sig_str) or sig_str
             _dbg(
                 "signature parsed: sig_str={} sig_type={} sig_rpc_type={}",
@@ -870,12 +970,18 @@ async def send_and_confirm_split_sol_payment(
             else:
                 for _ in range(30):
                     try:
-                        st = await client.get_signature_statuses([sig_rpc])
+                        st = await client.get_signature_statuses(
+                            [sig_rpc]
+                        )
                     except TypeError:
-                        st = await client.get_signature_statuses([sig_str])
+                        st = await client.get_signature_statuses(
+                            [sig_str]
+                        )
                     if st.value and st.value[0] is not None:
                         if st.value[0].err:
-                            raise RuntimeError("Transaction failed on-chain")
+                            raise RuntimeError(
+                                "Transaction failed on-chain"
+                            )
                         return sig_str
                     await asyncio.sleep(1)
 

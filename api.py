@@ -43,25 +43,13 @@ async def lifespan(app: FastAPI):
     """FastAPI lifespan manager.
 
     Responsibilities:
-    - Connect to the configured job vault (Redis by default).
-    - Optionally fall back to an in-memory vault when Redis is unavailable
-      (controlled by JOB_VAULT_BACKEND and FALLBACK_TO_MEMORY_VAULT).
+    - Connect to the configured job vault (in-memory by default).
     """
     global job_vault
 
     logger.info("Starting ATP Protocol Gateway")
-    try:
-        await job_vault.connect()
-    except Exception as e:
-        if config.JOB_VAULT_BACKEND == "redis" and config.FALLBACK_TO_MEMORY_VAULT:
-            logger.warning(
-                f"Redis unavailable ({e}). Falling back to in-memory job vault. "
-                "For production, configure Redis or set FALLBACK_TO_MEMORY_VAULT=false."
-            )
-            job_vault = InMemoryVault(default_ttl=config.JOB_TTL_SECONDS)
-            await job_vault.connect()
-        else:
-            raise
+
+    job_vault = InMemoryVault(default_ttl=config.JOB_TTL_SECONDS)
 
     yield
 

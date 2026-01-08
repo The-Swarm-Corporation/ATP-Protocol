@@ -39,11 +39,7 @@ SWARMS_API_URL = os.getenv(
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 AGENT_TREASURY_PUBKEY = os.getenv("AGENT_TREASURY_PUBKEY")
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 JOB_TTL_SECONDS = int(os.getenv("JOB_TTL_SECONDS", "600"))
-
-JOB_VAULT_BACKEND = os.getenv("JOB_VAULT_BACKEND", "redis").strip().lower()
-FALLBACK_TO_MEMORY_VAULT = _bool_env("FALLBACK_TO_MEMORY_VAULT", default=True)
 
 # Swarms Treasury for settlement fees
 SWARMS_TREASURY_PUBKEY = os.getenv(

@@ -17,8 +17,6 @@ RUN apt-get update && \
         gcc \
         build-essential \
         curl \
-        redis-server \
-        redis-tools \
         && \
     python -m venv /app/venv && \
     . /app/venv/bin/activate && \
@@ -33,9 +31,6 @@ COPY . /app/
 COPY launch_gunicorn.sh /app/launch_gunicorn.sh
 RUN chmod +x /app/launch_gunicorn.sh
 
-COPY boot.sh /app/boot.sh
-RUN chmod +x /app/boot.sh
-
 RUN chown -R appuser:appuser /app
 
 USER appuser
@@ -47,5 +42,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["/app/boot.sh"]
+CMD ["/app/launch_gunicorn.sh"]
 

@@ -20,7 +20,7 @@ class InMemoryVault:
 
     async def connect(self) -> None:
         logger.warning(
-            "Using in-memory job vault (no Redis). Jobs will be lost on restart."
+            "Using in-memory job vault. Jobs will be lost on restart."
         )
 
     async def disconnect(self) -> None:

@@ -7,9 +7,6 @@ pydantic
 # HTTP Client
 httpx
 
-# Redis for job vault
-redis
-
 # Solana blockchain integration
 solana
 solders

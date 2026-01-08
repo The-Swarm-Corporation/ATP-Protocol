@@ -8,7 +8,6 @@ Core flow:
 Important environment variables (server-side):
 - SWARMS_API_KEY: used to call the upstream Swarms agent API
 - AGENT_TREASURY_PUBKEY: payment recipient for the 402 challenge
-- REDIS_URL: job vault storage (unless JOB_VAULT_BACKEND=memory)
 - INPUT_COST_PER_MILLION_USD / OUTPUT_COST_PER_MILLION_USD: optional deterministic pricing from token counts
 """
 

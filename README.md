@@ -291,7 +291,7 @@ curl -X POST http://localhost:8000/v1/chat \
 
 For a complete example showing how to integrate ATP Protocol with [Swarms](https://github.com/kyegomez/swarms) agents, see:
 
-**[examples/swarms_integration_example.py](examples/swarms_integration_example.py)**
+**[examples/example.py](examples/example.py)** or **[example.py](example.py)** (root directory)
 
 This example demonstrates:
 
@@ -310,8 +310,71 @@ pip install swarms atp-protocol
 export OPENAI_API_KEY="your-key-here"
 
 # Run the example
-python examples/swarms_integration_example.py
+python examples/example.py
+# or
+python example.py
 ```
+
+---
+
+## Examples
+
+ATP Protocol includes comprehensive examples showing how to integrate with various AI agent frameworks and APIs. All examples demonstrate automatic payment processing, token usage tracking, and Solana settlement.
+
+### Framework Integration Examples
+
+| Framework | Directory | Description | Documentation |
+|-----------|-----------|-------------|--------------|
+| **LangChain** | [`examples/langchain/`](examples/langchain/) | LangChain agent integration with tools and conversational interface | [README](examples/langchain/README.md) |
+| **AutoGen** | [`examples/autogen/`](examples/autogen/) | AutoGen multi-agent conversation framework integration | [README](examples/autogen/README.md) |
+| **CrewAI** | [`examples/crewai/`](examples/crewai/) | CrewAI multi-agent crew workflows and task pipelines | [README](examples/crewai/README.md) |
+| **Anthropic API** | [`examples/anthropic/`](examples/anthropic/) | Direct integration with Anthropic's Claude API | [README](examples/anthropic/README.md) |
+
+### Standalone Examples
+
+| Example | File | Description |
+|---------|------|-------------|
+| **Swarms Integration** | [`examples/example.py`](examples/example.py) | Complete Swarms framework integration example |
+| **Full Flow** | [`examples/full_flow_example.py`](examples/full_flow_example.py) | End-to-end payment flow demonstration |
+| **Settlement Service** | [`examples/settlement_service_example.py`](examples/settlement_service_example.py) | Direct settlement service usage |
+| **Client Smoke Test** | [`examples/client_smoke_test.py`](examples/client_smoke_test.py) | Client testing and validation |
+
+### Quick Start with Examples
+
+Each example includes:
+- **Server** (`server.py`) - FastAPI server with ATP middleware configured
+- **Client** (`client.py`) - Example client with wallet authentication
+- **README** - Framework-specific setup and usage instructions
+
+**Getting started:**
+
+1. Navigate to an example directory:
+   ```bash
+   cd examples/langchain  # or autogen, crewai, anthropic
+   ```
+
+2. Install dependencies (see example's README for specific requirements)
+
+3. Configure environment variables:
+   ```bash
+   # Create .env file
+   OPENAI_API_KEY="your-key"  # or ANTHROPIC_API_KEY for Anthropic
+   ATP_PRIVATE_KEY="[1,2,3,...]"
+   ```
+
+4. Update `recipient_pubkey` in `server.py` with your Solana wallet address
+
+5. Run the server:
+   ```bash
+   python server.py
+   ```
+
+6. Test with the client:
+   ```bash
+   python client.py
+   ```
+
+For detailed instructions, see the [Examples README](examples/README.md) or the framework-specific README in each example directory.
 
 ---
 

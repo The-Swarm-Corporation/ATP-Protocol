@@ -2,6 +2,8 @@
 
 **ATP (Agent Transaction Protocol)** enables automatic payment processing for AI agent APIs on Solana. Add billing to any FastAPI endpoint with a few lines of code.
 
+> **Part of the [Swarms.ai](https://swarms.ai) ecosystem** - ATP Protocol is built for the [Swarms](https://github.com/kyegomez/swarms) multi-agent orchestration framework, providing seamless payment infrastructure for agent-to-agent transactions.
+
 ## What It Does
 
 ATP Protocol makes it easy to charge for API usage:
@@ -19,7 +21,7 @@ First, install the package:
 pip install atp-protocol
 ```
 
-## Usage 
+## Usage
 
 Then add automatic billing to your FastAPI app:
 
@@ -342,19 +344,15 @@ Set `payment_token=PaymentToken.USDC` to use USDC instead of SOL.
 
 ---
 
-## Installation
+## About Swarms.ai
 
-```bash
-pip install atp-protocol
-```
+ATP Protocol is part of the **[Swarms](https://swarms.ai)** ecosystem, the enterprise-grade production-ready multi-agent orchestration framework. Swarms provides the infrastructure for building and deploying autonomous agents at scale.
 
-Or from source:
+- **Framework**: [Swarms on GitHub](https://github.com/kyegomez/swarms)
+- **Documentation**: [docs.swarms.world](https://docs.swarms.world)
+- **Website**: [swarms.ai](https://swarms.ai)
 
-```bash
-git clone https://github.com/your-repo/ATP-Protocol
-cd ATP-Protocol
-pip install -e .
-```
+ATP Protocol integrates seamlessly with Swarms agents, enabling agent-to-agent payments and automatic billing for agent services built on the Swarms framework.
 
 ---
 

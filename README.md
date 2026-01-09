@@ -286,6 +286,32 @@ curl -X POST http://localhost:8000/v1/chat \
   -d '{"message": "Hello, world!"}'
 ```
 
+### Swarms Framework Integration
+
+For a complete example showing how to integrate ATP Protocol with [Swarms](https://github.com/kyegomez/swarms) agents, see:
+
+**[examples/swarms_integration_example.py](examples/swarms_integration_example.py)**
+
+This example demonstrates:
+
+- Setting up a Swarms agent
+- Creating FastAPI endpoints that use the agent
+- Automatic payment processing with ATP middleware
+- Usage tracking and billing for agent services
+
+**Quick start with Swarms:**
+
+```bash
+# Install dependencies
+pip install swarms atp-protocol
+
+# Set your OpenAI API key
+export OPENAI_API_KEY="your-key-here"
+
+# Run the example
+python examples/swarms_integration_example.py
+```
+
 ---
 
 ## Error Handling
@@ -344,7 +370,7 @@ Set `payment_token=PaymentToken.USDC` to use USDC instead of SOL.
 
 ---
 
-## About Swarms.ai
+## About Swarms
 
 ATP Protocol is part of the **[Swarms](https://swarms.ai)** ecosystem, the enterprise-grade production-ready multi-agent orchestration framework. Swarms provides the infrastructure for building and deploying autonomous agents at scale.
 

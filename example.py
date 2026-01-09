@@ -17,18 +17,17 @@ Environment Variables:
     OPENAI_API_KEY="your-openai-api-key"
     # Optional: Configure ATP settings
     ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
-    SOLANA_RPC_URL="https://api.mainnet-beta.solana.com"
 """
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger
+from swarms import Agent, count_tokens
 
 from atp.middleware import ATPSettlementMiddleware
 from atp.schemas import PaymentToken
-from swarms import Agent, count_tokens 
 
-# Create FastAPI app
+# Create FastAPI appx
 app = FastAPI(
     title="ATP Protocol + Swarms Integration",
     description="Example API showing ATP payment processing with Swarms agents",

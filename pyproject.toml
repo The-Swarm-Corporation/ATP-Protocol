@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "atp-protocol"
-version = "1.0.0"
+version = "1.2.0"
 description = "ATP Protocol - Agentic Trade Protocol. The easiest way to enable agent-to-agent payments powered by Solana."
 license = "MIT"
 authors = ["The Swarm Corporation"]
@@ -59,11 +59,10 @@ setuptools = "*"
 httpx = "*"
 loguru = "*"
 pydantic = "*"
-solana = "*"
-solders = "*"
 python-dotenv = "*"
-fastapi = "*"
 swarms = "*"
+fastapi = "*"
+starlette = "*"
 
 
 [tool.poetry.group.lint.dependencies]

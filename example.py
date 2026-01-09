@@ -22,7 +22,6 @@ app.add_middleware(
     allowed_endpoints=[
         "/v1/chat",
         "/v1/completions",
-        "/v1/agent/execute",
     ],
     input_cost_per_million_usd=10.0,  # $10 per million input tokens
     output_cost_per_million_usd=30.0,  # $30 per million output tokens

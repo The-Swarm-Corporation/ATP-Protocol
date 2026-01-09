@@ -1,17 +1,8 @@
-# Core Framework
-fastapi
-uvicorn
-gunicorn
-pydantic
-
-# HTTP Client
+setuptools
 httpx
-
-# Solana blockchain integration
-solana
-solders
-
-# Environment and logging
-python-dotenv
 loguru
+pydantic
+python-dotenv
 swarms
+fastapi
+starlette

@@ -73,5 +73,5 @@ ATP_SOLANA_DEBUG = _bool_env("ATP_SOLANA_DEBUG", default=False)
 
 # Settlement Service URL
 ATP_SETTLEMENT_URL = os.getenv(
-    "ATP_SETTLEMENT_URL", "http://localhost:8001"
+    "ATP_SETTLEMENT_URL", "https://facilitator.swarms.world"
 )

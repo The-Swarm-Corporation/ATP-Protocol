@@ -16,6 +16,7 @@ Each example shows how to:
 
 | Framework | Directory | Server | Client | Documentation |
 |-----------|-----------|--------|--------|---------------|
+| **Swarms** | [`swarms/`](./swarms/) | [`server.py`](./swarms/server.py) | [`client.py`](./swarms/client.py) | [`README.md`](./swarms/README.md) |
 | **LangChain** | [`langchain/`](./langchain/) | [`server.py`](./langchain/server.py) | [`client.py`](./langchain/client.py) | [`README.md`](./langchain/README.md) |
 | **AutoGen** | [`autogen/`](./autogen/) | [`server.py`](./autogen/server.py) | [`client.py`](./autogen/client.py) | [`README.md`](./autogen/README.md) |
 | **CrewAI** | [`crewai/`](./crewai/) | [`server.py`](./crewai/server.py) | [`client.py`](./crewai/client.py) | [`README.md`](./crewai/README.md) |
@@ -36,6 +37,7 @@ Each example shows how to:
 
 Select the framework you want to integrate:
 
+- **[Swarms](./swarms/)** - Enterprise-grade multi-agent orchestration framework
 - **[LangChain](./langchain/)** - Popular Python framework for building LLM applications
 - **[AutoGen](./autogen/)** - Microsoft's multi-agent conversation framework
 - **[CrewAI](./crewai/)** - Multi-agent orchestration framework
@@ -57,7 +59,7 @@ Create a `.env` file in the example directory:
 
 ```bash
 # Required: API key for your chosen framework
-OPENAI_API_KEY="your-key"  # For LangChain, AutoGen, CrewAI
+OPENAI_API_KEY="your-key"  # For Swarms, LangChain, AutoGen, CrewAI
 ANTHROPIC_API_KEY="your-key"  # For Anthropic
 
 # Required: Solana wallet private key (for client)
@@ -94,6 +96,21 @@ python client.py
 ```
 
 ## Framework-Specific Guides
+
+### Swarms Integration
+
+**[📁 swarms/](./swarms/)**
+
+Integrate ATP Protocol with Swarms agents - the native framework for ATP Protocol.
+
+**Features:**
+- Swarms agent execution with automatic payment
+- Built-in token counting with `count_tokens`
+- Conversational chat interface
+- System prompt support
+- Multi-turn conversation support
+
+**See:** [Swarms README](./swarms/README.md)
 
 ### LangChain Integration
 

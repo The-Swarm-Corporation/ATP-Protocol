@@ -325,6 +325,7 @@ ATP Protocol includes comprehensive examples showing how to integrate with vario
 
 | Framework | Directory | Description | Documentation |
 |-----------|-----------|-------------|--------------|
+| **Swarms** | [`examples/swarms/`](examples/swarms/) | Swarms framework integration - native ATP Protocol support | [README](examples/swarms/README.md) |
 | **LangChain** | [`examples/langchain/`](examples/langchain/) | LangChain agent integration with tools and conversational interface | [README](examples/langchain/README.md) |
 | **AutoGen** | [`examples/autogen/`](examples/autogen/) | AutoGen multi-agent conversation framework integration | [README](examples/autogen/README.md) |
 | **CrewAI** | [`examples/crewai/`](examples/crewai/) | CrewAI multi-agent crew workflows and task pipelines | [README](examples/crewai/README.md) |
@@ -350,7 +351,7 @@ Each example includes:
 
 1. Navigate to an example directory:
    ```bash
-   cd examples/langchain  # or autogen, crewai, anthropic
+   cd examples/swarms  # or langchain, autogen, crewai, anthropic
    ```
 
 2. Install dependencies (see example's README for specific requirements)
@@ -358,7 +359,8 @@ Each example includes:
 3. Configure environment variables:
    ```bash
    # Create .env file
-   OPENAI_API_KEY="your-key"  # or ANTHROPIC_API_KEY for Anthropic
+   OPENAI_API_KEY="your-key"  # For Swarms, LangChain, AutoGen, CrewAI
+   ANTHROPIC_API_KEY="your-key"  # For Anthropic
    ATP_PRIVATE_KEY="[1,2,3,...]"
    ```
 

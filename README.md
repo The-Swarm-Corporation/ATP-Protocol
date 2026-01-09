@@ -13,7 +13,15 @@ ATP Protocol makes it easy to charge for API usage:
 
 ## Quick Start
 
-Add automatic billing to your FastAPI app:
+First, install the package:
+
+```bash
+pip install atp-protocol
+```
+
+## Usage 
+
+Then add automatic billing to your FastAPI app:
 
 ```python
 from fastapi import FastAPI
@@ -325,16 +333,12 @@ Set `payment_token=PaymentToken.USDC` to use USDC instead of SOL.
 
 ## Security Considerations
 
-- **Private keys** are only used in-memory during the request
-- **No key storage** - keys are never persisted
-- **Settlement Service** handles all sensitive operations
-- **Transaction verification** ensures payments are confirmed before response
-
-For production, consider:
-
-- Using API keys that map to wallet keys (add your own layer)
-- Rate limiting to prevent abuse
-- Monitoring settlement failures
+| Security Aspect              | Details                                                           |
+|------------------------------|-------------------------------------------------------------------|
+| **Private keys**             | Only used in-memory during each request                           |
+| **No key storage**           | Keys are never persisted                                          |
+| **Settlement Service**       | Handles all sensitive operations                                  |
+| **Transaction verification** | Ensures payments are confirmed before a response is returned      |
 
 ---
 

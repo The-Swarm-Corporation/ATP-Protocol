@@ -62,6 +62,8 @@ pydantic = "*"
 solana = "*"
 solders = "*"
 python-dotenv = "*"
+fastapi = "*"
+swarms = "*"
 
 
 [tool.poetry.group.lint.dependencies]

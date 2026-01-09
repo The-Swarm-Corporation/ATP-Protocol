@@ -4,10 +4,10 @@ Example: Using ATP Settlement Middleware
 This example shows how to add ATP settlement to any FastAPI endpoint.
 
 The middleware accepts wallet private keys directly via headers, making it
-simple to use. Users can add their own API key handling layer if needed.
+simple to use.
 """
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from atp.middleware import ATPSettlementMiddleware
@@ -73,39 +73,6 @@ async def completions_endpoint(request: dict):
 async def health_check():
     """Health check endpoint - not in allowed_endpoints, so no settlement."""
     return {"status": "healthy"}
-
-
-# Example: Adding your own API key handling layer
-# You can create a dependency or middleware to map API keys to wallet private keys
-
-# Simple in-memory mapping (replace with database in production)
-API_KEY_TO_WALLET = {
-    "user_api_key_123": "[1,2,3,...]",  # Solana private key
-}
-
-
-def get_wallet_from_api_key(
-    api_key: str = Header(..., alias="x-api-key")
-) -> str:
-    """Custom dependency to map API keys to wallet private keys."""
-    if api_key not in API_KEY_TO_WALLET:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    return API_KEY_TO_WALLET[api_key]
-
-
-@app.post("/v1/chat-with-api-key")
-async def chat_with_api_key(
-    request: dict,
-    wallet_private_key: str = Depends(get_wallet_from_api_key),
-):
-    """Example endpoint with custom API key handling.
-
-    The wallet private key is extracted from the API key and can be
-    passed to the middleware via a custom header.
-    """
-    # In a real implementation, you'd set the header before calling the endpoint
-    # or use a custom middleware to inject it
-    pass
 
 
 if __name__ == "__main__":

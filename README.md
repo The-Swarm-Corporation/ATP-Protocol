@@ -145,7 +145,7 @@ The **Settlement Service** is a centralized service that handles:
 - Executing Solana transactions
 - Verifying payments
 
-This keeps your middleware simple and ensures all settlement logic is immutable and centralized.
+The official facilitator at **`https://facilitator.swarms.world`** is ultra-fast and powered by Rust, ensuring low-latency payment processing. This keeps your middleware simple and ensures all settlement logic is immutable and centralized.
 
 ---
 
@@ -175,6 +175,7 @@ This keeps your middleware simple and ensures all settlement logic is immutable 
 
 ```bash
 # Settlement Service URL (default: https://facilitator.swarms.world)
+# The official facilitator is ultra-fast and powered by Rust
 ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
 
 # Solana RPC URL (default: https://api.mainnet-beta.solana.com)
@@ -325,7 +326,9 @@ python examples/swarms_integration_example.py
 
 ## How the Settlement Service Works
 
-The Settlement Service is a centralized API that handles all payment logic. It provides:
+The Settlement Service is a centralized API that handles all payment logic. The official facilitator service at **`https://facilitator.swarms.world`** is ultra-fast and powered by Rust, ensuring low-latency payment processing.
+
+The service provides:
 
 - **`POST /v1/settlement/parse-usage`** - Parse usage from various formats
 - **`POST /v1/settlement/calculate-payment`** - Calculate payment amounts

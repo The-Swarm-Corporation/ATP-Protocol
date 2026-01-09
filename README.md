@@ -272,8 +272,6 @@ app.add_middleware(
     recipient_pubkey="YourPublicKeyHere",  # Required: endpoint host receives payment
     skip_preflight=False,  # Skip Solana transaction preflight simulation
     commitment="confirmed",  # Solana commitment level
-    usage_response_key="usage",  # Key in response where usage data is located
-    include_usage_in_response=True,  # Add usage/cost info to response
     require_wallet=True,  # Require wallet key (if False, skips settlement when missing)
 )
 ```
@@ -288,8 +286,6 @@ app.add_middleware(
 - **`recipient_pubkey`** (required): Solana public key of the recipient wallet (endpoint host receives main payment)
 - **`skip_preflight`** (default: `False`): Whether to skip preflight simulation for Solana transactions
 - **`commitment`** (default: `"confirmed"`): Solana commitment level (`processed`|`confirmed`|`finalized`)
-- **`usage_response_key`** (default: `"usage"`): Key in response JSON where usage data is located
-- **`include_usage_in_response`** (default: `True`): Whether to add usage/cost info to the response
 - **`require_wallet`** (default: `True`): Whether to require wallet private key (if False, skips settlement when missing)
 
 ### Usage Example
@@ -378,10 +374,9 @@ The middleware automatically detects and parses usage data from multiple API for
 - **Generic**: `input_tokens`, `output_tokens`, `total_tokens`
 - **Nested**: `usage.prompt_tokens`, `meta.usage`, `statistics`, etc.
 
-The middleware searches for usage data in this order:
-1. The configured `usage_response_key` (default: `"usage"`)
-2. Top-level keys in the response
-3. Nested structures (`usage`, `meta.usage`, `statistics`, etc.)
+The middleware automatically detects usage data by:
+1. Checking if the entire response contains usage-like keys at the top level
+2. Searching nested structures with common usage key names (`usage`, `token_usage`, `meta`, `statistics`, etc.)
 
 ### Payment Flow
 

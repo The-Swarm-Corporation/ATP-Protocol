@@ -31,8 +31,6 @@ app.add_middleware(
     # Note: treasury_pubkey is immutable and always uses config.SWARMS_TREASURY_PUBKEY
     skip_preflight=False,
     commitment="confirmed",
-    usage_response_key="usage",  # Key in response where usage data is located
-    include_usage_in_response=True,  # Add usage/cost info to response
     require_wallet=True,  # Require wallet private key for these endpoints
 )
 

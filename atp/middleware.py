@@ -67,8 +67,6 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
         recipient_pubkey: Optional[str] = None,
         skip_preflight: bool = False,
         commitment: str = "confirmed",
-        usage_response_key: str = "usage",
-        include_usage_in_response: bool = True,
         require_wallet: bool = True,
         settlement_service_url: Optional[str] = None,
     ):
@@ -92,8 +90,6 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
                 This wallet receives the main payment (after processing fee). Required.
             skip_preflight: Whether to skip preflight simulation for Solana transactions.
             commitment: Solana commitment level (processed|confirmed|finalized).
-            usage_response_key: Key in response JSON where usage data is located (default: "usage").
-            include_usage_in_response: Whether to add usage/cost info to the response.
             require_wallet: Whether to require wallet private key (if False, skips settlement when missing).
             settlement_service_url: Base URL of the settlement service. If not provided, uses
                 ATP_SETTLEMENT_URL environment variable (default: http://localhost:8001).
@@ -119,8 +115,6 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
             )
         self.skip_preflight = skip_preflight
         self.commitment = commitment
-        self.usage_response_key = usage_response_key
-        self.include_usage_in_response = include_usage_in_response
         self.require_wallet = require_wallet
         # Always use settlement service - initialize client with config value or provided URL
         service_url = (
@@ -146,10 +140,9 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
         """
         Extract usage information from response body.
 
-        Tries multiple strategies:
-        1. Look for usage data at the configured usage_response_key
-        2. Check if the entire response contains usage-like keys
-        3. Try nested structures (usage.usage, meta.usage, etc.)
+        Automatically detects usage data using multiple strategies:
+        1. Check if the entire response contains usage-like keys
+        2. Try nested structures with common usage key names (usage, token_usage, etc.)
 
         The usage data is then sent to the settlement service for parsing,
         so we just need to extract the raw usage object.
@@ -160,12 +153,7 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
                 return None
             data = json.loads(body_str)
 
-            # Strategy 1: Try the configured usage key first
-            usage = data.get(self.usage_response_key)
-            if usage and isinstance(usage, dict):
-                return usage
-
-            # Strategy 2: Check if the entire response is usage-like
+            # Strategy 1: Check if the entire response is usage-like
             if isinstance(data, dict):
                 # Check for common usage keys at top level
                 usage_keys = [
@@ -182,7 +170,7 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
                 if any(key in data for key in usage_keys):
                     return data
 
-            # Strategy 3: Try nested structures
+            # Strategy 2: Try nested structures
             # Check for usage nested in common locations
             for nested_key in [
                 "usage",
@@ -284,21 +272,20 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
                 detail=f"Settlement failed: {str(e)}",
             )
 
-        # Modify response to include usage/payment info if requested
-        if self.include_usage_in_response:
-            try:
-                response_data = json.loads(
-                    response_body.decode("utf-8")
-                )
-                response_data["atp_settlement"] = payment_result
-                response_data["atp_usage"] = usage
-                response_body = json.dumps(response_data).encode(
-                    "utf-8"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Failed to add settlement info to response: {e}"
-                )
+        # Always include settlement information in the response
+        try:
+            response_data = json.loads(
+                response_body.decode("utf-8")
+            )
+            response_data["atp_settlement"] = payment_result
+            response_data["atp_usage"] = usage
+            response_body = json.dumps(response_data).encode(
+                "utf-8"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to add settlement info to response: {e}"
+            )
 
         return Response(
             content=response_body,

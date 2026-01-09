@@ -63,6 +63,7 @@ python-dotenv = "*"
 swarms = "*"
 fastapi = "*"
 starlette = "*"
+cryptography = "*"
 
 
 [tool.poetry.group.lint.dependencies]

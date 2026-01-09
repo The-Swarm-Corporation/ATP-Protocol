@@ -75,3 +75,8 @@ ATP_SOLANA_DEBUG = _bool_env("ATP_SOLANA_DEBUG", default=False)
 ATP_SETTLEMENT_URL = os.getenv(
     "ATP_SETTLEMENT_URL", "https://facilitator.swarms.world"
 )
+
+# Settlement Service Timeout (in seconds)
+# Settlement operations can take longer due to blockchain confirmation times
+# Default: 300 seconds (5 minutes) - can be overridden via environment variable or middleware parameter
+ATP_SETTLEMENT_TIMEOUT = _float_env("ATP_SETTLEMENT_TIMEOUT") or 300.0

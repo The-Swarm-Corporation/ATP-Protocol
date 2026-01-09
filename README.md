@@ -11,6 +11,8 @@ ATP Protocol makes it easy to charge for API usage:
 - **Automatic billing** - Payment is processed automatically after each request
 - **Solana payments** - Uses SOL or USDC for fast, cheap transactions
 - **Token-based pricing** - Charges based on input/output token usage
+- **Response encryption** - Agent responses are encrypted until payment is confirmed
+- **Payment verification** - Responses are only decrypted after successful payment
 - **Zero infrastructure** - No payment processors, no databases, just Solana
 
 ## Quick Start
@@ -62,7 +64,7 @@ curl -X POST http://localhost:8000/v1/chat \
   -d '{"message": "Hello!"}'
 ```
 
-**Response includes payment details:**
+**Response includes payment details (decrypted after payment):**
 
 ```json
 {
@@ -80,7 +82,22 @@ curl -X POST http://localhost:8000/v1/chat \
 }
 ```
 
-That's it! Payment is automatically processed on Solana.
+**If payment fails, response remains encrypted:**
+
+```json
+{
+  "output": "encrypted_data_here...",
+  "usage": {"input_tokens": 150, "output_tokens": 50},
+  "atp_settlement": {
+    "error": "Settlement failed",
+    "message": "Insufficient funds"
+  },
+  "atp_settlement_status": "failed",
+  "atp_message": "Agent response is encrypted. Payment required to decrypt. Please provide a valid wallet private key and ensure payment succeeds."
+}
+```
+
+That's it! Payment is automatically processed on Solana, and responses are protected until payment is confirmed.
 
 ---
 
@@ -101,11 +118,18 @@ sequenceDiagram
   M->>E: Forward request
   E-->>M: Response + usage data
   M->>M: Extract token counts<br/>(auto-detects format)
+  M->>M: Encrypt agent response<br/>(protect output)
   M->>SS: Calculate payment<br/>(usage → USD → SOL/USDC)
   SS->>SS: Split payment<br/>(95% recipient, 5% treasury)
   SS->>S: Send payment transaction
   S-->>SS: Transaction signature
   SS-->>M: Settlement details
+  M->>M: Verify payment status
+  alt Payment succeeded
+    M->>M: Decrypt response
+  else Payment failed
+    M->>M: Keep response encrypted
+  end
   M->>M: Add settlement info<br/>to response
   M-->>C: Response + atp_settlement
 ```
@@ -116,10 +140,14 @@ sequenceDiagram
 2. **Middleware intercepts** and forwards to your endpoint
 3. **Your endpoint executes** and returns response with usage data
 4. **Middleware extracts** token counts (supports OpenAI, Anthropic, Google formats)
-5. **Settlement Service calculates** cost from token usage
-6. **Settlement Service splits** payment: 95% to you, 5% to Swarms Treasury
-7. **Settlement Service sends** Solana transaction
-8. **Middleware adds** settlement info to response
+5. **Middleware encrypts** agent response to protect output until payment is confirmed
+6. **Settlement Service calculates** cost from token usage
+7. **Settlement Service splits** payment: 95% to you, 5% to Swarms Treasury
+8. **Settlement Service sends** Solana transaction
+9. **Middleware verifies** payment status from settlement service
+10. **If payment succeeded**: Middleware decrypts response and returns it
+11. **If payment failed**: Response remains encrypted with error message
+12. **Middleware adds** settlement info to response
 
 ### Architecture
 
@@ -168,6 +196,8 @@ The official facilitator at **`https://facilitator.swarms.world`** is ultra-fast
 | `payment_token` | `PaymentToken.SOL` | `PaymentToken.SOL` or `PaymentToken.USDC` |
 | `require_wallet` | `True` | Require wallet key or skip settlement when missing |
 | `settlement_service_url` | From `ATP_SETTLEMENT_URL` env | Settlement service URL |
+| `settlement_timeout` | From `ATP_SETTLEMENT_TIMEOUT` env or `300.0` | Timeout in seconds for settlement requests (default: 5 minutes) |
+| `fail_on_settlement_error` | `False` | If `True`, raises HTTPException on settlement failure; if `False`, returns encrypted response with error |
 | `skip_preflight` | `False` | Skip Solana transaction preflight simulation |
 | `commitment` | `"confirmed"` | Solana commitment level (`processed`\|`confirmed`\|`finalized`) |
 
@@ -177,6 +207,11 @@ The official facilitator at **`https://facilitator.swarms.world`** is ultra-fast
 # Settlement Service URL (default: https://facilitator.swarms.world)
 # The official facilitator is ultra-fast and powered by Rust
 ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
+
+# Settlement Service Timeout (default: 300.0 seconds / 5 minutes)
+# Settlement operations may take longer due to blockchain confirmation times
+# Increase this value if you experience timeout errors even when payments succeed
+ATP_SETTLEMENT_TIMEOUT="300.0"
 
 # Solana RPC URL (default: https://api.mainnet-beta.solana.com)
 SOLANA_RPC_URL="https://api.mainnet-beta.solana.com"
@@ -248,6 +283,8 @@ app.add_middleware(
     recipient_pubkey="YourSolanaWalletHere",
     payment_token=PaymentToken.SOL,
     require_wallet=True,
+    fail_on_settlement_error=False,  # Return encrypted response on error
+    settlement_timeout=300.0,  # 5 minutes timeout
 )
 
 @app.post("/v1/chat")
@@ -380,12 +417,73 @@ For detailed instructions, see the [Examples README](examples/README.md) or the 
 
 ---
 
+## Response Encryption & Payment Verification
+
+ATP Protocol includes built-in **response encryption** to ensure users cannot access agent output until payment is confirmed. This provides strong protection against payment fraud.
+
+### How It Works
+
+1. **After endpoint execution**: The middleware encrypts sensitive response fields (e.g., `output`, `response`, `result`, `message`) before processing payment
+2. **Payment processing**: Settlement is attempted via the Settlement Service
+3. **Payment verification**: The middleware checks if payment status is `"paid"` and a transaction signature exists
+4. **Conditional decryption**:
+   - ✅ **Payment succeeded**: Response is decrypted and returned to client
+   - ❌ **Payment failed**: Response remains encrypted with error message
+
+### Encrypted Response Format
+
+When payment fails, the response includes encrypted data and a clear message:
+
+```json
+{
+  "output": "encrypted_data_here...",
+  "usage": {"input_tokens": 150, "output_tokens": 50},
+  "atp_settlement": {
+    "error": "Settlement service unavailable",
+    "message": "Request timed out after 300.0s. The payment may have been sent successfully, but the settlement service did not respond in time.",
+    "type": "ReadTimeout"
+  },
+  "atp_settlement_status": "failed",
+  "atp_message": "Agent response is encrypted. Payment required to decrypt. Please provide a valid wallet private key and ensure payment succeeds."
+}
+```
+
+### Settlement Error Handling
+
+The middleware provides flexible error handling via the `fail_on_settlement_error` parameter:
+
+- **`fail_on_settlement_error=False`** (default):
+  - Returns encrypted response with error details
+  - Client receives usage data and error information
+  - Useful for debugging and graceful degradation
+
+- **`fail_on_settlement_error=True`**:
+  - Raises `HTTPException` (500) when settlement fails
+  - Request fails immediately
+  - Useful for strict payment requirements
+
+### Timeout Handling
+
+Settlement operations may take time due to blockchain confirmation. The middleware provides informative timeout messages:
+
+- **ReadTimeout**: Payment may have succeeded, but settlement service didn't respond in time
+- **ConnectTimeout**: Settlement service is unreachable
+- **HTTP errors**: Network or service errors with status codes
+
+Increase `settlement_timeout` if you experience timeouts even when payments succeed.
+
+---
+
 ## Error Handling
 
 - **Missing wallet key**: Returns `401 Unauthorized` if `require_wallet=True`
 - **Missing usage data**: Logs warning and returns original response (no settlement)
-- **Payment failure**: Returns `500 Internal Server Error` with error details
+- **Payment failure**:
+  - If `fail_on_settlement_error=False`: Returns encrypted response with error details
+  - If `fail_on_settlement_error=True`: Returns `500 Internal Server Error` and raises exception
 - **Invalid private key**: Returns `500 Internal Server Error` with parsing error
+- **Encryption failure**: Returns `500 Internal Server Error` without exposing agent output
+- **Settlement timeout**: Returns encrypted response with timeout message (payment may have succeeded)
 
 ---
 
@@ -434,7 +532,10 @@ Set `payment_token=PaymentToken.USDC` to use USDC instead of SOL.
 | **Private keys**             | Only used in-memory during each request                           |
 | **No key storage**           | Keys are never persisted                                          |
 | **Settlement Service**       | Handles all sensitive operations                                  |
+| **Response encryption**      | Agent outputs are encrypted until payment is confirmed            |
+| **Payment verification**     | Responses are only decrypted after successful payment verification |
 | **Transaction verification** | Ensures payments are confirmed before a response is returned      |
+| **Encrypted failure mode**   | Failed payments keep responses encrypted, preventing output access |
 
 ---
 

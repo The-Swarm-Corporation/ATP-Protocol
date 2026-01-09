@@ -107,6 +107,98 @@ class PaymentToken(str, Enum):
     USDC = "USDC"
 
 
+class ATPSettlementMiddlewareConfig(BaseModel):
+    """Configuration schema for ATP Settlement Middleware.
+    
+    This schema defines all configuration parameters for the ATPSettlementMiddleware.
+    All parameters match the middleware's __init__ signature, making it easy to
+    configure the middleware from a validated configuration object.
+    """
+
+    allowed_endpoints: List[str] = Field(
+        ...,
+        description=(
+            "List of endpoint paths to apply settlement to (e.g., ['/v1/chat']). "
+            "Supports path patterns - exact matches only."
+        ),
+    )
+    input_cost_per_million_usd: float = Field(
+        ...,
+        description="Cost per million input tokens in USD.",
+        gt=0.0,
+    )
+    output_cost_per_million_usd: float = Field(
+        ...,
+        description="Cost per million output tokens in USD.",
+        gt=0.0,
+    )
+    wallet_private_key_header: str = Field(
+        default="x-wallet-private-key",
+        description=(
+            "HTTP header name containing the wallet private key. "
+            "The private key should be in JSON array format (e.g., '[1,2,3,...]') "
+            "or base58 string format."
+        ),
+    )
+    payment_token: PaymentToken = Field(
+        default=PaymentToken.SOL,
+        description="Token to use for payment (SOL or USDC).",
+    )
+    recipient_pubkey: Optional[str] = Field(
+        default=None,
+        description=(
+            "Solana public key of the recipient wallet (the endpoint host). "
+            "This wallet receives the main payment (after processing fee). "
+            "Required when initializing the middleware."
+        ),
+    )
+    skip_preflight: bool = Field(
+        default=False,
+        description="Whether to skip preflight simulation for Solana transactions.",
+    )
+    commitment: str = Field(
+        default="confirmed",
+        description="Solana commitment level (processed|confirmed|finalized).",
+    )
+    require_wallet: bool = Field(
+        default=True,
+        description=(
+            "Whether to require wallet private key. "
+            "If False, skips settlement when missing."
+        ),
+    )
+    settlement_service_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "Base URL of the settlement service. If not provided, uses "
+            "ATP_SETTLEMENT_URL environment variable (default: http://localhost:8001). "
+            "The middleware always uses the settlement service for all settlement operations."
+        ),
+    )
+    fail_on_settlement_error: bool = Field(
+        default=False,
+        description=(
+            "If True, raises HTTPException when settlement fails (default: False). "
+            "If False, returns the response with settlement error info instead of failing the request."
+        ),
+    )
+    settlement_timeout: Optional[float] = Field(
+        default=None,
+        description=(
+            "Timeout in seconds for settlement service requests. "
+            "Default: from ATP_SETTLEMENT_TIMEOUT env var or 300.0 (5 minutes). "
+            "Settlement operations may take longer due to blockchain confirmation times. "
+            "Increase this value if you experience timeout errors even when payments are successfully sent."
+        ),
+        gt=0.0,
+    )
+
+    class Config:
+        """Pydantic configuration."""
+
+        use_enum_values = True
+
+
 class AgentTask(BaseModel):
     """Complete agent task request requiring full agent specification."""
 
@@ -169,3 +261,97 @@ class SettleTrade(BaseModel):
         default="confirmed",
         description="Confirmation level to wait for (processed|confirmed|finalized)",
     )
+
+
+
+class MarketplaceDiscovery(BaseModel):
+    name: str = Field(
+        ...,
+        description="The name of the marketplace",
+    )
+    id: str = Field(
+        ...,
+        description="The id of the marketplace. Generated automatically by the server.",
+    )
+    url: str = Field(
+        ...,
+        description="The URL of the endpoint",
+    )
+    description: str = Field(
+        ...,
+        description="The description of the marketplace",
+    )
+    input_schema: Optional[Union[Dict[Any, Any], List[Dict[str, Any]]]] = Field(
+        default=None,
+        description="The input schema of the endpoint",
+    )
+    output_schema: Optional[Union[Dict[Any, Any], List[Dict[str, Any]]]] = Field(
+        default=None,
+        description="The output schema of the endpoint",
+    )
+    input_cost_per_million_usd: float = Field(
+        ...,
+        description="The cost per million tokens (USD) for input to this endpoint.",
+    )
+    output_cost_per_million_usd: float = Field(
+        ...,
+        description="The cost per million tokens (USD) for output from this endpoint.",
+    )
+    payment_token: PaymentToken = Field(
+        default=PaymentToken.SOL,
+        description="Payment token to use for settlement (e.g. SOL, USDC)."
+    )
+    recipient_pubkey: Optional[str] = Field(
+        default=None,
+        description="Solana recipient public key for settlement."
+    )
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="The tags of the marketplace.",
+    )
+    business_model: Optional[str] = Field(
+        default="usage",
+        description="The business model of the marketplace. Usage-based pricing is the default. one-time pricing is also supported.",
+    )
+    
+
+
+
+
+class MarketplaceDiscoveryResponse(BaseModel):
+    # Fetch the resources
+    resources: List[MarketplaceDiscovery] = Field(
+        ...,
+        description="The resources of the marketplace",
+    )
+    limit: Optional[int] = Field(
+        default=20,
+        description="Number of resources to return (default: 20)",
+    )
+    offset: Optional[int] = Field(
+        default=0,
+        description="Offset for pagination (default: 0)",
+    )
+    timestamp: float = Field(
+        ...,
+        description="The timestamp of the response. Generated automatically by the server.",
+    )
+    
+    
+    
+class MarketplaceIndividualDiscoveryQueryRequest(BaseModel):
+    id: str = Field(
+        ...,
+        description="The id of the marketplace to query.",
+    )
+    name: Optional[str] = Field(
+        default=None,
+        description="The name of the marketplace to query.",
+    )
+    url: Optional[str] = Field(
+        default=None,
+        description="The URL of the endpoint to query.",
+    )
+    
+    
+    

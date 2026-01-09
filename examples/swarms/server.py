@@ -38,7 +38,7 @@ app = FastAPI(
 AGENT_MODEL = "gpt-4o-mini"  # Model name for agent and token counting
 agent = Agent(
     model_name=AGENT_MODEL,  # Specify the LLM
-    max_loops="auto",  # Set the number of interactions
+    max_loops=1,  # Set the number of interactions
     interactive=False,  # Disable interactive mode for API use
 )
 

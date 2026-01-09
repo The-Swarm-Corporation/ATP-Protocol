@@ -27,7 +27,9 @@ app.add_middleware(
     output_cost_per_million_usd=30.0,  # $30 per million output tokens
     wallet_private_key_header="x-wallet-private-key",  # Header name for wallet private key
     payment_token=PaymentToken.SOL,  # Payment token (SOL or USDC)
-    # Note: treasury_pubkey is immutable and always uses config.SWARMS_TREASURY_PUBKEY
+    recipient_pubkey="YourRecipientPublicKeyHere",  # Required: recipient wallet public key
+    # Note: treasury_pubkey is automatically set from SWARMS_TREASURY_PUBKEY
+    # environment variable on the settlement service and cannot be overridden
     skip_preflight=False,
     commitment="confirmed",
     require_wallet=True,  # Require wallet private key for these endpoints

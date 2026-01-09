@@ -17,8 +17,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger
 import anthropic
-from typing import Dict, Any, List, Optional
-from swarms import count_tokens
 
 from atp.middleware import ATPSettlementMiddleware
 from atp.schemas import PaymentToken

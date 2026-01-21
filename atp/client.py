@@ -459,6 +459,15 @@ class ATPClient:
             logger.debug(f"Making {method} request to {url}")
         
         try:
+            # Check if wallet key is available
+            key = wallet_private_key or self.wallet_private_key
+            if not key:
+                raise ValueError(
+                    "wallet_private_key is required for ATP-protected endpoints. "
+                    "Provide it in client initialization or pass it to the request method. "
+                    "Example: client = ATPClient(wallet_private_key='[1,2,3,...]')"
+                )
+            
             # Get headers with wallet authentication
             headers = self._get_headers(wallet_private_key=wallet_private_key)
             

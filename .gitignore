@@ -10,6 +10,7 @@ agent_workspace/
 # Distribution / packaging
 .Python
 build/
+.env
 develop-eggs/
 dist/
 downloads/

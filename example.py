@@ -19,6 +19,8 @@ Environment Variables:
     ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
 """
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger
@@ -26,6 +28,11 @@ from swarms import Agent, count_tokens
 
 from atp.middleware import ATPSettlementMiddleware
 from atp.schemas import PaymentToken
+from dotenv import load_dotenv
+
+load_dotenv()
+
+recipient_key = os.getenv("ATP_RECIPIENT_PUBKEY")
 
 # Create FastAPI appx
 app = FastAPI(
@@ -36,6 +43,7 @@ app = FastAPI(
 # Initialize Swarms Agent
 # This agent will be used to process tasks
 AGENT_MODEL = "gpt-4o-mini"  # Model name for agent and token counting
+
 agent = Agent(
     model_name=AGENT_MODEL,  # Specify the LLM
     max_loops=1,
@@ -52,7 +60,7 @@ app.add_middleware(
     ],
     input_cost_per_million_usd=10.0,  # $10 per million input tokens
     output_cost_per_million_usd=30.0,  # $30 per million output tokens
-    recipient_pubkey="F9wBFsAynpDSWmfXbknGsSBsymeW3Gh8f7SgYhTh52gD",  # Your wallet receives 95% of payments
+    recipient_pubkey=recipient_key,  # Your wallet receives 95% of payments
     payment_token=PaymentToken.SOL,  # Use SOL for payments
     wallet_private_key_header="x-wallet-private-key",  # Header for client wallet key
     require_wallet=True,  # Require wallet key for payment

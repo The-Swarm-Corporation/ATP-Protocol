@@ -2,76 +2,126 @@
 
 This directory contains comprehensive examples demonstrating how to integrate **ATP Protocol** with various AI agent frameworks and APIs to enable automatic payment processing.
 
-## Overview
+## Directory Structure
 
-Each example shows how to:
-- Set up a FastAPI server with ATP middleware
-- Integrate with different AI agent frameworks
-- Process automatic Solana payments based on token usage
-- Handle wallet authentication and settlement
+```
+examples/
+├── tutorials/          # Framework integration tutorials
+│   ├── swarms/        # Swarms framework integration
+│   ├── langchain/     # LangChain framework integration
+│   ├── autogen/       # AutoGen framework integration
+│   ├── crewai/        # CrewAI framework integration
+│   └── anthropic/     # Anthropic API integration
+├── client/            # Client-side examples
+│   ├── example_health_check.py
+│   ├── example_parse_usage.py
+│   ├── example_calculate_payment.py
+│   ├── example_settle.py
+│   └── example_request.py
+└── server/            # Server-side examples
+    ├── example.py
+    ├── full_flow_example.py
+    ├── settlement_service_example.py
+    └── client_smoke_test.py
+```
 
-## Examples Directory Structure
+## Quick Navigation
 
-### Framework Integration Examples
+### 🎓 [Framework Tutorials](./tutorials/)
+Step-by-step tutorials for integrating ATP Protocol with AI agent frameworks:
+- [Swarms](./tutorials/swarms/) - Enterprise-grade multi-agent orchestration
+- [LangChain](./tutorials/langchain/) - Popular Python LLM framework
+- [AutoGen](./tutorials/autogen/) - Microsoft's multi-agent framework
+- [CrewAI](./tutorials/crewai/) - Multi-agent orchestration
+- [Anthropic](./tutorials/anthropic/) - Claude API integration
 
-| Framework | Directory | Server | Client | Documentation |
-|-----------|-----------|--------|--------|---------------|
-| **Swarms** | [`swarms/`](./swarms/) | [`server.py`](./swarms/server.py) | [`client.py`](./swarms/client.py) | [`README.md`](./swarms/README.md) |
-| **LangChain** | [`langchain/`](./langchain/) | [`server.py`](./langchain/server.py) | [`client.py`](./langchain/client.py) | [`README.md`](./langchain/README.md) |
-| **AutoGen** | [`autogen/`](./autogen/) | [`server.py`](./autogen/server.py) | [`client.py`](./autogen/client.py) | [`README.md`](./autogen/README.md) |
-| **CrewAI** | [`crewai/`](./crewai/) | [`server.py`](./crewai/server.py) | [`client.py`](./crewai/client.py) | [`README.md`](./crewai/README.md) |
-| **Anthropic API** | [`anthropic/`](./anthropic/) | [`server.py`](./anthropic/server.py) | [`client.py`](./anthropic/client.py) | [`README.md`](./anthropic/README.md) |
+### 💻 [Client Examples](./client/)
+Simple examples demonstrating the ATP Client API:
+- Health check
+- Parse usage
+- Calculate payment
+- Execute settlement
+- Make requests to ATP-protected endpoints
 
-### Standalone Examples
-
-| Example | File | Description |
-|---------|------|-------------|
-| **Swarms Integration** | [`example.py`](./example.py) | Complete Swarms framework integration example |
-| **Full Flow Example** | [`full_flow_example.py`](./full_flow_example.py) | End-to-end payment flow demonstration |
-| **Settlement Service** | [`settlement_service_example.py`](./settlement_service_example.py) | Direct settlement service usage example |
-| **Client Smoke Test** | [`client_smoke_test.py`](./client_smoke_test.py) | Client testing and validation |
+### 🖥️ [Server Examples](./server/)
+Server-side examples for ATP middleware and settlement:
+- Basic middleware setup
+- Full payment flow
+- Settlement service usage
+- Client smoke tests
 
 ## Quick Start
 
-### 1. Choose Your Framework
+### Option 1: Framework Integration (Recommended for Beginners)
 
-Select the framework you want to integrate:
+1. **Choose a framework tutorial:**
+   ```bash
+   cd examples/tutorials/swarms  # or langchain, autogen, crewai, anthropic
+   ```
 
-- **[Swarms](./swarms/)** - Enterprise-grade multi-agent orchestration framework
-- **[LangChain](./langchain/)** - Popular Python framework for building LLM applications
-- **[AutoGen](./autogen/)** - Microsoft's multi-agent conversation framework
-- **[CrewAI](./crewai/)** - Multi-agent orchestration framework
-- **[Anthropic API](./anthropic/)** - Direct integration with Claude API
+2. **Follow the README.md** in that directory for setup instructions
 
-### 2. Install Dependencies
+3. **Run the server:**
+   ```bash
+   python server.py
+   ```
 
-Each example folder contains its own requirements. Navigate to the example directory and install:
+4. **Test with the client:**
+   ```bash
+   python client.py
+   ```
+
+### Option 2: Client API Examples
+
+1. **Navigate to client examples:**
+   ```bash
+   cd examples/client
+   ```
+
+2. **Run a simple example:**
+   ```bash
+   python example_health_check.py
+   ```
+
+3. **See [Client README](./client/README.md)** for all examples
+
+### Option 3: Server Examples
+
+1. **Navigate to server examples:**
+   ```bash
+   cd examples/server
+   ```
+
+2. **Run a server example:**
+   ```bash
+   python example.py
+   ```
+
+3. **See [Server README](./server/README.md)** for all examples
+
+## Common Setup
+
+### Environment Variables
+
+Most examples require these environment variables:
 
 ```bash
-cd examples/[framework-name]
-pip install -r requirements.txt  # If available
-# Or install manually based on the example's README
-```
+# Required for client examples
+ATP_WALLET_PRIVATE_KEY="[1,2,3,...]"  # Your wallet private key
 
-### 3. Configure Environment
-
-Create a `.env` file in the example directory:
-
-```bash
-# Required: API key for your chosen framework
+# Required for framework tutorials
 OPENAI_API_KEY="your-key"  # For Swarms, LangChain, AutoGen, CrewAI
 ANTHROPIC_API_KEY="your-key"  # For Anthropic
 
-# Required: Solana wallet private key (for client)
-ATP_PRIVATE_KEY="[1,2,3,...]"  # JSON array format or base58 string
-
-# Optional: ATP Settlement Service URL
+# Optional
 ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
+ATP_RECIPIENT_PUBKEY="YourRecipientPublicKey"
+ATP_ENDPOINT_URL="http://localhost:8000/v1/chat"
 ```
 
-### 4. Update Server Configuration
+### Server Configuration
 
-Edit `server.py` and update the `recipient_pubkey`:
+Update the `recipient_pubkey` in server examples:
 
 ```python
 app.add_middleware(
@@ -79,146 +129,6 @@ app.add_middleware(
     recipient_pubkey="YourSolanaWalletHere",  # ← Update this!
     # ... other config
 )
-```
-
-### 5. Run the Server
-
-```bash
-python server.py
-```
-
-### 6. Test with Client
-
-In another terminal:
-
-```bash
-python client.py
-```
-
-## Framework-Specific Guides
-
-### Swarms Integration
-
-**[📁 swarms/](./swarms/)**
-
-Integrate ATP Protocol with Swarms agents - the native framework for ATP Protocol.
-
-**Features:**
-- Swarms agent execution with automatic payment
-- Built-in token counting with `count_tokens`
-- Conversational chat interface
-- System prompt support
-- Multi-turn conversation support
-
-**See:** [Swarms README](./swarms/README.md)
-
-### LangChain Integration
-
-**[📁 langchain/](./langchain/)**
-
-Integrate ATP Protocol with LangChain agents and tools.
-
-**Features:**
-- LangChain agent execution with automatic payment
-- Tool integration (calculator example)
-- Conversational chat interface
-- Token usage tracking
-
-**See:** [LangChain README](./langchain/README.md)
-
-### AutoGen Integration
-
-**[📁 autogen/](./autogen/)**
-
-Integrate ATP Protocol with AutoGen multi-agent conversations.
-
-**Features:**
-- Multi-agent conversation support
-- Task execution with configurable turns
-- Agent delegation and collaboration
-- Token usage tracking
-
-**See:** [AutoGen README](./autogen/README.md)
-
-### CrewAI Integration
-
-**[📁 crewai/](./crewai/)**
-
-Integrate ATP Protocol with CrewAI multi-agent crews.
-
-**Features:**
-- Multi-agent crew workflows
-- Research and writing task pipelines
-- Agent role specialization
-- Token usage tracking
-
-**See:** [CrewAI README](./crewai/README.md)
-
-### Anthropic API Integration
-
-**[📁 anthropic/](./anthropic/)**
-
-Integrate ATP Protocol with Anthropic's Claude API.
-
-**Features:**
-- Native Anthropic Messages API support
-- OpenAI-compatible chat completions
-- Actual token usage from API responses
-- Multi-turn conversation support
-
-**See:** [Anthropic README](./anthropic/README.md)
-
-## Common Patterns
-
-All examples follow similar patterns:
-
-### 1. Server Setup
-
-```python
-from fastapi import FastAPI
-from atp.middleware import ATPSettlementMiddleware
-from atp.schemas import PaymentToken
-
-app = FastAPI()
-
-app.add_middleware(
-    ATPSettlementMiddleware,
-    allowed_endpoints=["/v1/agent/run"],
-    input_cost_per_million_usd=10.0,
-    output_cost_per_million_usd=30.0,
-    recipient_pubkey="YourSolanaWalletHere",
-    payment_token=PaymentToken.SOL,
-)
-```
-
-### 2. Usage Tracking
-
-Return usage data in your endpoint responses:
-
-```python
-@app.post("/v1/agent/run")
-async def run_agent(request: dict):
-    # ... execute agent ...
-    
-    return {
-        "output": result,
-        "usage": {
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": input_tokens + output_tokens,
-        }
-    }
-```
-
-### 3. Client Authentication
-
-Include wallet private key in headers:
-
-```python
-headers = {
-    "Content-Type": "application/json",
-    "x-wallet-private-key": WALLET_PRIVATE_KEY,
-}
 ```
 
 ## Payment Details
@@ -230,55 +140,70 @@ All examples use the same payment structure:
 - **Payment split**: 95% to your wallet, 5% to Swarms Treasury
 - **Payment token**: SOL (configurable to USDC)
 
-## Testing
+## What Each Section Contains
 
-Each example includes:
+### Tutorials (`tutorials/`)
 
-1. **Server** (`server.py`) - FastAPI server with ATP middleware
-2. **Client** (`client.py`) - Example client with wallet authentication
-3. **Health Check** - Endpoint to verify server status
+Complete integration guides for popular AI frameworks. Each tutorial includes:
+- **Server** (`server.py`) - FastAPI server with ATP middleware
+- **Client** (`client.py`) - Example client code
+- **README.md** - Framework-specific documentation
 
-### Running Tests
+**Best for:** Learning how to integrate ATP Protocol with your chosen framework.
 
-```bash
-# Start server
-python server.py
+### Client Examples (`client/`)
 
-# In another terminal, run client
-python client.py
-```
+Simple, focused examples demonstrating the ATP Client API:
+- Health checking the facilitator
+- Parsing usage from various formats
+- Calculating payments
+- Executing settlements
+- Making requests to ATP-protected endpoints
+
+**Best for:** Understanding the client API and testing functionality.
+
+### Server Examples (`server/`)
+
+Server-side examples showing:
+- Basic middleware setup
+- Complete payment flows
+- Settlement service integration
+- Testing and validation
+
+**Best for:** Understanding server-side implementation and payment flows.
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Missing wallet key**: Ensure `ATP_PRIVATE_KEY` is set in `.env`
-2. **Invalid recipient pubkey**: Update `recipient_pubkey` in `server.py`
+1. **Missing wallet key**: Ensure `ATP_WALLET_PRIVATE_KEY` is set
+2. **Invalid recipient pubkey**: Update `recipient_pubkey` in server files
 3. **API key errors**: Verify your framework's API key is set correctly
 4. **Payment failures**: Check Solana wallet has sufficient balance
 
 ### Getting Help
 
-- Check the framework-specific README in each example folder
+- Check the specific README in each example directory
 - Review the main [ATP Protocol README](../README.md)
 - Verify environment variables are set correctly
 
 ## Next Steps
 
-After running an example:
+After running examples:
 
-1. Customize the agent configuration for your use case
-2. Implement proper token tracking (use actual API responses when available)
-3. Add authentication/authorization layers
-4. Configure custom pricing rates
-5. Deploy to production
+1. **Customize** agent configuration for your use case
+2. **Implement** proper token tracking (use actual API responses when available)
+3. **Add** authentication/authorization layers
+4. **Configure** custom pricing rates
+5. **Deploy** to production
 
 ## Resources
 
 - [ATP Protocol Documentation](../README.md)
+- [Client API Documentation](../atp/client.py)
+- [Middleware Documentation](../atp/middleware.py)
 - [Swarms Framework](https://github.com/kyegomez/swarms)
 - [LangChain Documentation](https://python.langchain.com/)
 - [AutoGen Documentation](https://microsoft.github.io/autogen/)
 - [CrewAI Documentation](https://docs.crewai.com/)
 - [Anthropic API Documentation](https://docs.anthropic.com/)
-

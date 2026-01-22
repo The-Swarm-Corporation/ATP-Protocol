@@ -113,7 +113,6 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
         payment_token (PaymentToken): Token to use for payment (SOL or USDC).
         skip_preflight (bool): Whether to skip preflight simulation for Solana transactions.
         commitment (str): Solana commitment level (processed|confirmed|finalized).
-        require_wallet (bool): Whether to require wallet private key header.
         fail_on_settlement_error (bool): Whether to raise exception on settlement failure.
         settlement_service_client (SettlementServiceClient): Client for settlement service API.
         encryptor (ResponseEncryptor): Encryptor for protecting agent responses.
@@ -178,7 +177,6 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
         recipient_pubkey: Optional[str] = None,
         skip_preflight: bool = False,
         commitment: str = "confirmed",
-        require_wallet: bool = True,
         settlement_service_url: Optional[str] = None,
         fail_on_settlement_error: bool = False,
         settlement_timeout: Optional[float] = None,
@@ -203,7 +201,6 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
                 This wallet receives the main payment (after processing fee). Required.
             skip_preflight: Whether to skip preflight simulation for Solana transactions.
             commitment: Solana commitment level (processed|confirmed|finalized).
-            require_wallet: Whether to require wallet private key (if False, skips settlement when missing).
             settlement_service_url: Base URL of the settlement service. If not provided, uses
                 ATP_SETTLEMENT_URL environment variable (default: http://localhost:8001).
                 The middleware always uses the settlement service for all settlement operations.
@@ -230,7 +227,6 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
         # environment variable on the settlement service and cannot be overridden
         self.skip_preflight = skip_preflight
         self.commitment = commitment
-        self.require_wallet = require_wallet
         self.fail_on_settlement_error = fail_on_settlement_error
         # Always use settlement service - initialize client with config value or provided URL
         service_url = (
@@ -372,7 +368,7 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
             error details.
 
         **Raises:**
-            HTTPException: If wallet is required but missing (401), or if
+            HTTPException: If wallet is required but missing (402 Payment Required), or if
                 `fail_on_settlement_error=True` and settlement fails.
 
         **Response Modifications:**
@@ -383,7 +379,7 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
             - Removes `Content-Length` and `Content-Encoding` headers (recalculated)
 
         **Error Scenarios:**
-            - Missing wallet (if required): Returns 401 Unauthorized
+            - Missing wallet (if required): Returns 402 Payment Required
             - No usage data: Returns original response without settlement
             - Encryption failure: Returns 500 with error (response not exposed)
             - Settlement failure: Returns encrypted response with error details
@@ -397,14 +393,12 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
 
         # Extract wallet private key
         private_key = self._extract_wallet_private_key(request)
+        
         if not private_key:
-            if self.require_wallet:
-                raise HTTPException(
-                    status_code=401,
-                    detail=f"Missing wallet private key in header: {self.wallet_private_key_header}",
-                )
-            # If wallet not required, skip settlement
-            return await call_next(request)
+            raise HTTPException(
+                status_code=402,
+                detail="Payment required. Missing wallet private key in header. Please provide a valid wallet private key and ensure payment succeeds. The header should be x-wallet-private-key.",
+            )
 
         # Execute the endpoint
         response = await call_next(request)

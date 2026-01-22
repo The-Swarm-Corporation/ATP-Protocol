@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "atp-protocol"
-version = "1.2.0"
+version = "1.3.0"
 description = "ATP Protocol - Agentic Trade Protocol. The easiest way to enable agent-to-agent payments powered by Solana."
 license = "MIT"
 authors = ["The Swarm Corporation"]

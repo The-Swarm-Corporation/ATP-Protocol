@@ -213,8 +213,6 @@ ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
 # Increase this value if you experience timeout errors even when payments succeed
 ATP_SETTLEMENT_TIMEOUT="300.0"
 
-# Solana RPC URL (default: https://api.mainnet-beta.solana.com)
-SOLANA_RPC_URL="https://api.mainnet-beta.solana.com"
 ```
 
 ---
@@ -476,14 +474,14 @@ Increase `settlement_timeout` if you experience timeouts even when payments succ
 
 ## Error Handling
 
-- **Missing wallet key**: Returns `401 Unauthorized` if `require_wallet=True`
-- **Missing usage data**: Logs warning and returns original response (no settlement)
-- **Payment failure**:
-  - If `fail_on_settlement_error=False`: Returns encrypted response with error details
-  - If `fail_on_settlement_error=True`: Returns `500 Internal Server Error` and raises exception
-- **Invalid private key**: Returns `500 Internal Server Error` with parsing error
-- **Encryption failure**: Returns `500 Internal Server Error` without exposing agent output
-- **Settlement timeout**: Returns encrypted response with timeout message (payment may have succeeded)
+| Error Scenario              | Behavior                                                                                                              |
+|----------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| **Missing wallet key**      | Returns `401 Unauthorized` if `require_wallet=True`                                                                  |
+| **Missing usage data**      | Logs warning and returns original response (no settlement)                                                           |
+| **Payment failure**         | If `fail_on_settlement_error=False`: Returns encrypted response with error details  <br> If `fail_on_settlement_error=True`: Returns `500 Internal Server Error` and raises exception |
+| **Invalid private key**     | Returns `500 Internal Server Error` with parsing error                                                               |
+| **Encryption failure**      | Returns `500 Internal Server Error` without exposing agent output                                                    |
+| **Settlement timeout**      | Returns encrypted response with timeout message (payment may have succeeded)                                         |
 
 ---
 
@@ -493,9 +491,11 @@ The Settlement Service is a centralized API that handles all payment logic. The 
 
 The service provides:
 
-- **`POST /v1/settlement/parse-usage`** - Parse usage from various formats
-- **`POST /v1/settlement/calculate-payment`** - Calculate payment amounts
-- **`POST /v1/settlement/settle`** - Execute payment transaction
+| Endpoint                                     | Description                        |
+|----------------------------------------------|------------------------------------|
+| **POST /v1/settlement/parse-usage**          | Parse usage from various formats   |
+| **POST /v1/settlement/calculate-payment**    | Calculate payment amounts          |
+| **POST /v1/settlement/settle**               | Execute payment transaction        |
 
 The middleware calls these endpoints automatically. You can also call them directly if needed.
 

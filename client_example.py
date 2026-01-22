@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 wallet_key = os.getenv("ATP_PRIVATE_KEY")
-endpoint_url = os.getenv("ATP_ENDPOINT_URL", "http://localhost:8000/v1/agent/execute")
+endpoint_url = "http://localhost:8000/v1/agent/execute"
 
 
 client = ATPClient(wallet_private_key=wallet_key)

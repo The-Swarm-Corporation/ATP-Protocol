@@ -86,7 +86,7 @@ class ATPClient:
     def __init__(
         self,
         wallet_private_key: Optional[str] = None,
-        settlement_service_url: Optional[str] = None,
+        settlement_service_url: Optional[str] = ATP_SETTLEMENT_URL,
         settlement_timeout: Optional[float] = None,
         wallet_private_key_header: str = "x-wallet-private-key",
         verbose: bool = False,

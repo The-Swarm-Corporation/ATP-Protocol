@@ -1,4 +1,4 @@
-# ATP **Agent Trade Protocol** 
+# ATP: Agent Trade Protocol
 
 > The premier agent-to-agent payment protocol and foundational framework to empower the agent economy.
 

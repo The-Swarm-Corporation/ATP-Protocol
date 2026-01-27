@@ -1,6 +1,6 @@
-# ATP Protocol
+# ATP **Agent Trade Protocol** 
 
-**Agent Trade Protocol** - Enterprise-grade payment settlement system for agent-to-agent transactions on the Solana blockchain.
+> The premier agent-to-agent payment protocol and foundational framework to empower the agent economy.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,7 +8,7 @@
 
 ## Overview
 
-ATP (Agent Trade Protocol) is a payment settlement system that enables automatic payment processing for AI agent services on the Solana blockchain. The protocol provides a middleware layer that automatically deducts payments from user wallets based on token usage, ensuring secure and transparent transactions.
+ATP (Agent Trade Protocol) is the premier agent-to-agent payment protocol that will be the foundational framework to empower the agent economy. Designed to overcome x402's issues and make agent-to-agent payments dynamic and simple, ATP enables automatic payment processing for agent services on the Solana blockchain. The protocol provides a middleware layer that automatically deducts payments from user wallets based on token usage, ensuring secure and transparent transactions.
 
 ### Key Features
 

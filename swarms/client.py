@@ -23,8 +23,6 @@ client = ATPClient(wallet_private_key=WALLET_PRIVATE_KEY)
 
 
 async def settle_payment():
-    """Example 1: Automatic settlement via server middleware"""
-    print("\n=== Example 1: Automatic Settlement (Middleware) ===")
     
     response = await client.post(
         url=f"{API_BASE_URL}/v1/agent/execute",

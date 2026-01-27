@@ -52,7 +52,7 @@ app.add_middleware(
     ],
     input_cost_per_million_usd=10.0,  # $10 per million input tokens
     output_cost_per_million_usd=30.0,  # $30 per million output tokens
-    recipient_pubkey="YourSolanaWalletHere",  # Your wallet receives 95% of payments
+    recipient_pubkey="7MaX4muAn8ZQREJxnupm8sgokwFHujgrGfH9Qn81BuEV",  # Your wallet receives 95% of payments
     payment_token=PaymentToken.SOL,  # Use SOL for payments
     wallet_private_key_header="x-wallet-private-key",  # Header for client wallet key
     require_wallet=True,  # Require wallet key for payment

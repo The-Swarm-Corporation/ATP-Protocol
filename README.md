@@ -385,6 +385,24 @@ ruff check .
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
+## Citation
+
+If you use ATP (Agent Trade Protocol) in your research or software, please cite **The Swarm Corporation**:
+
+```bibtex
+@software{atp_protocol,
+  title = {ATP: Agent Trade Protocol},
+  author = {{The Swarm Corporation}},
+  year = {2025},
+  url = {https://github.com/The-Swarm-Corporation/ATP-Protocol},
+  note = {Agent-to-agent payment protocol for the agent economy}
+}
+```
+
+Plain text:
+
+> The Swarm Corporation. ATP: Agent Trade Protocol. https://github.com/The-Swarm-Corporation/ATP-Protocol
+
 ## Acknowledgments
 
 Built by [The Swarm Corporation](https://swarms.ai) to enable agent-to-agent commerce on the blockchain.

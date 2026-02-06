@@ -1,0 +1,304 @@
+% ATP: Agent Trade Protocol — Research Paper
+% Format: Standard AI/Systems conference style (NeurIPS/ICML-like structure)
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, shapes.multipart, calc, fit, backgrounds}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+\newcommand{\atp}{\textsc{atp}}
+\newcommand{\solana}{\textsc{Solana}}
+
+\title{ATP: Agent Trade Protocol\\A Decentralized Payment Framework for the Agent Economy}
+\author{Anonymous Author(s)}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The emergence of autonomous AI agents as first-class economic actors necessitates payment protocols that are secure, transparent, and interoperable across diverse agent frameworks. We present \atp{} (Agent Trade Protocol), a protocol and reference implementation for agent-to-agent payments on the \solana{} blockchain. \atp{} provides a middleware layer that automatically deducts payments from user wallets based on token usage, with response encryption ensuring that agent output is only released after on-chain payment confirmation. The design centralizes settlement logic in an immutable facilitator service while keeping API hosts and clients lightweight, supports multiple usage formats (OpenAI, Anthropic, Google, etc.), and splits payments between a protocol treasury and service recipients. We describe the architecture, security model, and implementation, and discuss implications for the agent economy.
+\end{abstract}
+
+%==============================================================================
+\section{Introduction}
+%==============================================================================
+
+Autonomous and semi-autonomous AI agents are increasingly deployed as services that consume computational resources—notably large language model (LLM) inference—and produce valuable outputs. Monetizing these services in a way that is transparent, auditable, and compatible with existing agent frameworks remains an open challenge. Traditional API billing relies on centralized payment processors and proprietary usage metering, which do not naturally extend to peer-to-peer or multi-agent settings where agents may call one another across organizational boundaries. Moreover, in a world where agents act on behalf of users or other agents, the question of who pays whom, and under what conditions, must be answered in a manner that is both cryptographically verifiable and easy to integrate into heterogeneous software stacks.
+
+\atp{} (Agent Trade Protocol) addresses this gap by defining a protocol for agent-to-agent payments that executes on the \solana{} blockchain. The protocol is designed to overcome limitations of prior proposals (e.g., x402-style approaches) by making payment processing dynamic and simple: API hosts protect selected endpoints with middleware that (1) intercepts responses containing usage data, (2) encrypts agent output until payment is confirmed, (3) delegates parsing and settlement to a centralized facilitator service, and (4) releases decrypted output only after on-chain confirmation. Clients supply a wallet private key (or equivalent) in a configurable header; the facilitator computes payment from usage and pricing parameters, creates and signs a split-payment transaction (recipient plus treasury), and submits it to \solana{}. This design keeps settlement logic immutable and centralized while allowing arbitrary agent backends and client frameworks to integrate with minimal configuration. By tying payment to observable usage (input and output token counts) and enforcing a strict pay-before-decrypt invariant, \atp{} reduces the risk of free-riding and ensures that service providers are paid before their output is consumed.
+
+The contributions of this work are: (1) a clear specification of the \atp{} architecture comprising Settlement Service (facilitator), Middleware, and Client; (2) a security model based on response encryption and pay-before-decrypt semantics; (3) an open-source reference implementation including FastAPI middleware, a programmatic client, and a settlement service client; and (4) a discussion of format flexibility, payment splitting, and operational considerations for the agent economy. The remainder of the paper is organized as follows. Section~\ref{sec:related} reviews related work. Section~\ref{sec:architecture} presents the protocol architecture and data flow. Section~\ref{sec:security} details the security model. Section~\ref{sec:implementation} describes the implementation. Section~\ref{sec:discussion} discusses design choices and limitations. Section~\ref{sec:conclusion} concludes.
+
+%==============================================================================
+\section{Related Work}
+\label{sec:related}
+%==============================================================================
+
+\textbf{Blockchain-based payments for APIs.} Several efforts have explored using blockchains for API or service payments. The x402 protocol and similar proposals aim to attach payment conditions to HTTP requests or responses \citep{x402}. \atp{} differs by tying payment to \emph{usage} (input/output token counts) reported in the response, and by encrypting the response until payment is confirmed, reducing the risk of free-riding. Payment is executed on \solana{}, providing fast finality and low fees compared to general-purpose chains.
+
+\textbf{Usage-based pricing and metering.} Cloud and API providers routinely meter usage (e.g., tokens, requests) and bill via centralized systems. \atp{} does not replace metering logic at the agent host; instead, it assumes the host already produces usage data (in any of several common formats) and uses that data solely to compute and execute payment. The facilitator normalizes usage across OpenAI, Anthropic, Google/Gemini, and other formats, so agents built with different frameworks can participate without format-specific adapters.
+
+\textbf{Agent economies and multi-agent systems.} Research on agent economies \citep{agent-economy} and multi-agent systems \citep{mas-survey} has long considered markets, auctions, and contracts. \atp{} provides a concrete payment layer that can sit underneath such mechanisms: agents (or their owners) hold wallets and pay for services in SOL or USDC based on observable usage, with settlement and fee splitting enforced by the facilitator and the chain.
+
+\textbf{Secure computation and conditional disclosure.} The idea of withholding output until payment is verified is related to conditional disclosure and fair exchange \citep{fair-exchange}. \atp{} implements this with symmetric encryption (Fernet) and a simple rule: decrypt only when the facilitator returns a successful settlement result including a transaction signature. No zero-knowledge or secure multi-party computation is required for the base protocol.
+
+\textbf{Solana and high-throughput chains.} \solana{} offers sub-second confirmation and low per-transaction fees, making it suitable for micropayments and high-frequency agent transactions. By anchoring settlement on \solana{}, \atp{} benefits from existing wallets, RPC providers, and ecosystem tooling while keeping the protocol independent of any single front-end or custody solution.
+
+%==============================================================================
+\section{Protocol Architecture}
+\label{sec:architecture}
+%==============================================================================
+
+\subsection{Component Overview}
+
+\atp{} comprises three main components (Figure~\ref{fig:architecture}): the \textbf{Settlement Service} (facilitator), the \textbf{Middleware}, and the \textbf{Client}.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=1.2cm and 1.8cm,
+  box/.style={rectangle, draw, rounded corners, minimum width=2.2cm, minimum height=0.9cm, align=center, font=\small},
+  layer/.style={rectangle, draw, dashed, rounded corners, inner sep=12pt},
+  arrow/.style={-Stealth, thick}
+]
+  \node[box, fill=blue!15] (client) {Client\\\small(wallet, requests)};
+  \node[box, fill=green!15, right=2.2cm of client] (middleware) {Middleware\\\small(FastAPI, encrypt/decrypt)};
+  \node[box, fill=orange!15, right=2.2cm of middleware] (backend) {Agent\\Backend};
+  \node[box, fill=red!15, below=1.8cm of $(middleware)!0.5!(backend)$] (facilitator) {Settlement Service\\\small(parse, pay, sign)};
+  \node[box, fill=gray!15, below=1.2cm of facilitator] (solana) {\solana{}\\Blockchain};
+
+  \draw[arrow] (client) -- node[above, font=\scriptsize] {POST + wallet} (middleware);
+  \draw[arrow] (middleware) -- node[above, font=\scriptsize] {request} (backend);
+  \draw[arrow] (backend) -- node[above, font=\scriptsize] {response + usage} (middleware);
+  \draw[arrow] (middleware) -- node[left, font=\scriptsize] {usage, pricing} (facilitator);
+  \draw[arrow] (facilitator) -- node[right, font=\scriptsize] {tx} (solana);
+  \draw[arrow] (solana) -- node[right, font=\scriptsize] {confirmed} (facilitator);
+  \draw[arrow] (facilitator) -- node[left, font=\scriptsize] {status, sig} (middleware);
+  \draw[arrow] (middleware) -- node[above, font=\scriptsize] {decrypted + settlement} (client);
+
+  \node[layer, fit=(client)] {};
+  \node[layer, fit=(middleware)(backend)] {};
+  \node[layer, fit=(facilitator)(solana)] {};
+\end{tikzpicture}
+\caption{High-level \atp{} architecture. Client sends requests with wallet credentials; middleware intercepts responses, encrypts output, and calls the Settlement Service; facilitator parses usage, computes payment, and executes a split-payment transaction on \solana{}; middleware decrypts only after confirmation.}
+\label{fig:architecture}
+\end{figure}
+
+\textbf{Settlement Service (Facilitator).} A centralized service that owns all settlement logic: parsing usage from arbitrary response shapes, computing USD cost from input/output token rates, converting to SOL or USDC using a price oracle, and creating/signing/sending a split-payment transaction (recipient plus treasury). The service exposes HTTP endpoints: \texttt{/v1/settlement/parse-usage}, \texttt{/v1/settlement/calculate-payment}, \texttt{/v1/settlement/settle}, and \texttt{/health}. Centralizing this logic keeps it immutable and consistent across all API hosts and avoids duplicating parsing and chain interaction in every deployment.
+
+\textbf{Middleware.} A FastAPI (Starlette) middleware that wraps selected endpoints. For each request to an allowed path, it (1) extracts the payer's wallet private key from a configurable header (e.g., \texttt{x-wallet-private-key}), (2) forwards the request to the application, (3) consumes the response body and sends it to the facilitator's parse-usage endpoint to obtain normalized usage, (4) encrypts agent output fields (e.g., \texttt{response}, \texttt{output}, \texttt{result}, \texttt{message}), (5) calls the facilitator's settle endpoint with usage, pricing, and recipient, (6) on success (status \texttt{paid} and a transaction signature), decrypts the response and attaches settlement metadata, (7) on failure, returns the response still encrypted and attaches error details. The middleware does not perform signing or chain access itself.
+
+\textbf{Client.} A user-facing library that (1) adds the wallet key to request headers when calling ATP-protected endpoints, (2) optionally decrypts responses (using the same Fernet key semantics as the server if configured), and (3) can call the facilitator directly for parse-usage, calculate-payment, settle, and health-check. This allows both “call an ATP endpoint” and “settle a payment out-of-band” workflows. The client is agnostic to the backend framework (Swarms, LangChain, AutoGen, CrewAI, or custom); it only needs the endpoint URL and a valid wallet. Health checks and payment calculation can be performed without a wallet, supporting discovery and pricing transparency before commitment.
+
+\subsection{Request and Response Flow}
+
+Figure~\ref{fig:sequence} illustrates the sequence of operations for a single request to an ATP-protected endpoint. The client initiates with a POST request including the wallet private key in a configurable header. The middleware does not process the request body for payment purposes; it merely forwards the request to the backend and captures the response. Once the backend returns a JSON body containing usage information (in any of the supported formats), the middleware buffers the body, sends it to the facilitator's parse-usage endpoint, and receives normalized token counts. It then encrypts the agent output fields so that even if the response were intercepted, the content would be inaccessible. The settle call to the facilitator includes the payer's private key (forwarded from the header), the normalized usage, the host's pricing parameters and recipient public key, and the chosen payment token. The facilitator computes the USD cost, converts to SOL or USDC, builds a split-payment transaction, signs it with the payer's key, and submits it to the \solana{} network. Upon confirmation (at the configured commitment level: processed, confirmed, or finalized), the facilitator returns the transaction signature and status to the middleware. Only then does the middleware decrypt the response and append \texttt{atp\_settlement}, \texttt{atp\_usage}, and \texttt{atp\_settlement\_status} to the JSON before returning it to the client.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  entity/.style={rectangle, draw, minimum height=0.5cm, font=\tiny},
+  msg/.style={font=\tiny, midway}
+]
+  \node[entity, minimum width=1.2cm] (C) at (0,3.5) {Client};
+  \node[entity, minimum width=1.2cm] (M) at (2,3.5) {Middleware};
+  \node[entity, minimum width=1.2cm] (B) at (4,3.5) {Backend};
+  \node[entity, minimum width=1.2cm] (F) at (6,3.5) {Facilitator};
+  \node[entity, minimum width=1cm] (S) at (8,3.5) {\solana};
+
+  \draw[-Stealth] (C.east) -- (M.west) node[msg, above] {1};
+  \draw[-Stealth] (M.east) -- (B.west) node[msg, above] {2};
+  \draw[-Stealth] (B.west) -- (M.east) node[msg, above] {3};
+  \draw[-Stealth] (M.south) |- ++(-1,-0.8) -| (F.north) node[msg, pos=0.25] {4};
+  \draw[-Stealth] (F.east) -- (S.west) node[msg, above] {5};
+  \draw[-Stealth] (S.west) -- (F.east) node[msg, above] {6};
+  \draw[-Stealth] (F.south) |- ++(1,-0.8) -| (M.south) node[msg, pos=0.25] {7};
+  \draw[-Stealth] (M.west) -- (C.east) node[msg, above] {8};
+\end{tikzpicture}
+\caption{Request/response sequence. 1: POST+wallet; 2: forward; 3: response+usage; 4: parse+settle; 5--6: tx and confirmation; 7: status+sig; 8: decrypted response.}
+\label{fig:sequence}
+\end{figure}
+
+The middleware only processes responses with status code $< 400$. If usage cannot be parsed (no input/output/total tokens found), it returns \texttt{422} and does not encrypt or settle. Thus, endpoints must include usage in a supported shape (see~\ref{sec:usage-formats}). Table~\ref{tab:summary} summarizes the main protocol parameters and their roles.
+\begin{table}[t]
+\centering
+\caption{Protocol summary: main parameters and responsibilities.}
+\label{tab:summary}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Element} & \textbf{Role} \\
+\midrule
+Settlement Service & Parse usage, compute payment, sign \& send tx, return status \\
+Middleware & Intercept response, encrypt, call facilitator, decrypt on success \\
+Client & Add wallet header, optional decrypt, direct facilitator API \\
+\texttt{allowed\_endpoints} & Paths on which settlement is applied \\
+\texttt{recipient\_pubkey} & Solana address receiving net payment (after fee) \\
+\texttt{input/output\_cost\_per\_million\_usd} & Host-defined pricing \\
+\texttt{payment\_token} & SOL or USDC \\
+Treasury (facilitator config) & Receives fee (e.g. 5\%); immutable on service \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Usage Data Formats}
+
+The facilitator's parse-usage endpoint accepts the full response body (or a subtree) and recursively searches for known usage shapes. Supported formats include:
+\begin{itemize}
+  \item \textbf{OpenAI:} \texttt{usage.prompt\_tokens}, \texttt{completion\_tokens}, \texttt{total\_tokens}
+  \item \textbf{Anthropic:} \texttt{usage.input\_tokens}, \texttt{output\_tokens}
+  \item \textbf{Google/Gemini:} \texttt{usageMetadata.promptTokenCount}, \texttt{candidatesTokenCount}, \texttt{totalTokenCount}
+  \item \textbf{Cohere and nested variants:} \texttt{usage.usage}, \texttt{meta.usage}, etc.
+\end{itemize}
+The service normalizes to \texttt{input\_tokens}, \texttt{output\_tokens}, and \texttt{total\_tokens}. This format flexibility allows agents built with different LLM providers and frameworks to be paid uniformly without host-side format conversion.
+
+\subsection{Payment Calculation and Splitting}
+
+Payment is computed in USD from usage and host-defined rates:
+\begin{equation}
+  C_{\mathrm{USD}} = \frac{n_{\mathrm{in}}}{10^6}\, r_{\mathrm{in}} + \frac{n_{\mathrm{out}}}{10^6}\, r_{\mathrm{out}},
+\end{equation}
+where $n_{\mathrm{in}}$, $n_{\mathrm{out}}$ are input and output token counts and $r_{\mathrm{in}}$, $r_{\mathrm{out}}$ are costs per million tokens in USD. The facilitator converts $C_{\mathrm{USD}}$ to token amount using a price oracle, then splits the payment (Figure~\ref{fig:payment}): a configurable fraction (e.g., 5\%) goes to the protocol treasury (\texttt{SWARMS\_TREASURY\_PUBKEY}) and the remainder to the recipient (\texttt{recipient\_pubkey} provided by the middleware). Both SOL and USDC are supported; the treasury and fee percentage are set on the facilitator and cannot be overridden by clients or middleware. The host specifies \texttt{recipient\_pubkey} when registering the middleware, so each endpoint (or each deployment) can direct payments to the appropriate wallet. This supports multi-tenant or multi-service deployments where different routes are operated by different entities.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=0.8cm,
+  box/.style={rectangle, draw, rounded corners, minimum width=1.8cm, font=\small},
+  arrow/.style={-Stealth}
+]
+  \node[box, fill=blue!10] (payer) {Payer\\Wallet};
+  \node[box, fill=green!15, below left=1.2cm and 0.6cm of payer] (recipient) {Recipient\\(e.g. 95\%)};
+  \node[box, fill=orange!15, below right=1.2cm and 0.6cm of payer] (treasury) {Treasury\\(e.g. 5\%)};
+
+  \draw[arrow] (payer) -- node[left, font=\scriptsize] {total} (recipient);
+  \draw[arrow] (payer) -- node[right, font=\scriptsize] {fee} (treasury);
+  \node[font=\scriptsize, below=0.2cm of payer] {Single transaction, two outputs};
+\end{tikzpicture}
+\caption{Payment split: one on-chain transaction from payer to recipient and treasury.}
+\label{fig:payment}
+\end{figure}
+
+%==============================================================================
+\section{Security Model}
+\label{sec:security}
+%==============================================================================
+
+\subsection{Response Encryption and Pay-before-Decrypt}
+
+The core security guarantee is that agent output is not visible to the client until payment has been confirmed on-chain. The middleware encrypts designated response fields (default: \texttt{output}, \texttt{response}, \texttt{result}, \texttt{message}) using Fernet symmetric encryption. Decryption is performed only when the facilitator returns a result with \texttt{status = paid} and a non-empty \texttt{transaction\_signature}. If settlement fails (insufficient funds, network error, etc.), the middleware returns the response body still encrypted and attaches \texttt{atp\_settlement} with error details and \texttt{atp\_settlement\_status = failed}. Thus, a client cannot obtain plaintext output without paying.
+
+Encryption keys are managed per process: the server may set \texttt{ATP\_ENCRYPTION\_KEY} (a base64-encoded Fernet key) for consistency across restarts; otherwise a key is generated at startup and is not shared with the client. The client's decrypt step assumes the same key material is available (e.g., in a trusted client that receives the key out-of-band, or when the client is used only to pass through already-decrypted responses from a server that performed decryption). In the standard deployment, the client does not need to decrypt; the server decrypts before sending the final response.
+
+\subsection{Wallet and Key Handling}
+
+The payer's wallet private key is supplied in an HTTP header (default \texttt{x-wallet-private-key}) in either JSON array form (\texttt{[1,2,...,64]}) or base58. The middleware forwards this to the facilitator only over HTTPS in production; the facilitator uses the key in-memory to sign the settlement transaction and does not persist it. Best practice is to avoid logging or persisting the key anywhere. For stricter security, API hosts can add an authentication layer (e.g., API key or OAuth) and map authenticated users to wallet keys via a secure backend store instead of passing the key from the client.
+
+\subsection{Trust and Adversarial Assumptions}
+
+The design assumes: (1) the facilitator is honest and correctly computes and executes the split payment; (2) the API host's middleware and backend are correctly configured (allowed endpoints, recipient, pricing); (3) the client does not see decrypted output unless payment succeeded. A malicious facilitator could in principle underreport usage or misdirect funds; mitigation relies on operational trust and, where needed, audits of the facilitator. On-chain transparency allows anyone to verify transaction amounts and recipients. A malicious or compromised API host could in theory return incorrect usage (e.g., inflated token counts) to overcharge; the facilitator merely executes the payment from the usage it receives. Defenses include host reputation, optional client-side checks against expected usage, and future extensions such as attestations or usage receipts signed by the backend. Key material in headers is sensitive; production deployments should use TLS and avoid logging or persisting the wallet private key. The facilitator uses the key only in-memory for the duration of the settle request and does not store it.
+
+%==============================================================================
+\section{Implementation}
+\label{sec:implementation}
+%==============================================================================
+
+The reference implementation is in Python and consists of the following modules.
+
+\textbf{Middleware (\texttt{atp.middleware}).} \texttt{ATPSettlementMiddleware} extends Starlette's \texttt{BaseHTTPMiddleware}. In \texttt{dispatch}, it checks the path against \texttt{allowed\_endpoints}, extracts the wallet key (missing key yields \texttt{402 Payment Required}), calls \texttt{call\_next(request)}, then consumes the response body. It calls \texttt{SettlementServiceClient.parse\_usage} with the body, and if usage is missing, raises \texttt{422}. It then encrypts the response via \texttt{ResponseEncryptor.encrypt\_response\_data}, calls \texttt{settlement\_client.settle} with usage, pricing, \texttt{recipient\_pubkey}, and \texttt{payment\_token}. On success (status \texttt{paid} and transaction signature present), it decrypts and sets \texttt{atp\_settlement}, \texttt{atp\_usage}, and \texttt{atp\_settlement\_status}; on failure it leaves the body encrypted and sets \texttt{atp\_settlement} to the error payload. Configuration includes \texttt{fail\_on\_settlement\_error}: if \texttt{True}, settlement failures raise an \texttt{HTTPException} instead of returning an encrypted response.
+
+\textbf{Settlement client (\texttt{atp.settlement\_client}).} \texttt{SettlementServiceClient} uses \texttt{httpx.AsyncClient} to POST to the facilitator's \texttt{parse-usage}, \texttt{calculate-payment}, and \texttt{settle} endpoints, and GET \texttt{/health}. Errors are wrapped in \texttt{SettlementServiceError} with status code, detail, and type. Timeouts are configurable (default 300\,s) to accommodate slow chain confirmation.
+
+\textbf{Client (\texttt{atp.client}).} \texttt{ATPClient} holds an optional default wallet key, settlement URL, and timeout. It builds headers with the wallet key, and provides \texttt{parse\_usage}, \texttt{calculate\_payment}, \texttt{settle}, and \texttt{health\_check} that delegate to the settlement client, plus \texttt{request}/\texttt{post}/\texttt{get} for ATP-protected endpoints. When \texttt{auto\_decrypt=True}, it runs \texttt{ResponseEncryptor.decrypt\_response\_data} on the JSON response so that callers see decrypted fields when the server has already decrypted (or when the client has the same key).
+
+\textbf{Encryption (\texttt{atp.encryption}).} \texttt{ResponseEncryptor} uses \texttt{cryptography.fernet.Fernet}. It encrypts/decrypts strings and provides \texttt{encrypt\_response\_data} / \texttt{decrypt\_response\_data} that iterate over a configurable list of field names (default \texttt{output}, \texttt{response}, \texttt{result}, \texttt{message}), encrypting only string values and setting \texttt{<field>\_encrypted = True}.
+
+\textbf{Schemas and config.} \texttt{atp.schemas} defines \texttt{PaymentToken} (SOL, USDC), \texttt{ATPSettlementMiddlewareConfig} (Pydantic), and related request/response models. \texttt{atp.config} loads environment variables for settlement URL, timeout, treasury pubkey, fee percentage, and RPC URL. The middleware can be instantiated with \texttt{fail\_on\_settlement\_error=False} (default), in which case settlement failures result in an HTTP 200 response with the body still encrypted and \texttt{atp\_settlement\_status=failed} plus error details in \texttt{atp\_settlement}. This allows clients to detect payment failures without the request itself failing, enabling retry or alternative payment flows. When \texttt{fail\_on\_settlement\_error=True}, any settlement error is raised as an \texttt{HTTPException} with an appropriate status code (e.g., 400 for insufficient funds, 500 for server errors). The settlement client maps facilitator error responses into \texttt{SettlementServiceError} with \texttt{status\_code}, \texttt{error\_detail}, and \texttt{error\_type}, so that middleware and application code can handle timeouts, connection errors, and business logic errors (e.g., invalid key, insufficient balance) in a structured way.
+
+\subsection{Data Flow Schematic}
+
+Figure~\ref{fig:encryption-flow} summarizes the encryption and decryption points in the response path.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=0.6cm,
+  stage/.style={rectangle, draw, minimum height=0.7cm, minimum width=2.8cm, font=\small},
+  arrow/.style={-Stealth, thick}
+]
+  \node[stage, fill=green!20] (A) {Backend response (plain)};
+  \node[stage, right=1.2cm of A, fill=yellow!25] (B) {Encrypt output fields};
+  \node[stage, right=1.2cm of B, fill=blue!15] (C) {Call facilitator settle};
+  \node[stage, right=1.2cm of C, fill=red!15] (D) {Payment confirmed?};
+  \node[stage, below=0.8cm of D, fill=green!20] (E) {Decrypt and return};
+  \node[stage, below=0.8cm of C, fill=gray!20] (F) {Return encrypted + error};
+
+  \draw[arrow] (A) -- (B);
+  \draw[arrow] (B) -- (C);
+  \draw[arrow] (C) -- (D);
+  \draw[arrow] (D) -- node[right, font=\scriptsize] {yes} (E);
+  \draw[arrow] (D) -- node[above, font=\scriptsize] {no} (F);
+\end{tikzpicture}
+\caption{Encryption flow: plain response is encrypted before settlement; decryption occurs only after payment confirmation; otherwise encrypted response and error are returned.}
+\label{fig:encryption-flow}
+\end{figure}
+
+%==============================================================================
+\section{Discussion}
+\label{sec:discussion}
+%==============================================================================
+
+\textbf{Centralization vs. decentralization.} Settlement is intentionally centralized in the facilitator to keep parsing and payment logic consistent and upgradeable without changing every host. The \emph{execution} of payment is on \solana{}, so flows and amounts are public. Future work could explore a more decentralized facilitator (e.g., multiple signers or a separate settlement chain) while retaining the same API contract.
+
+\textbf{Format flexibility.} By pushing all usage parsing to the facilitator, the protocol supports new provider formats by updating the facilitator only. Hosts and clients remain agnostic to the exact shape of usage in the response, as long as the facilitator can normalize it. This reduces integration cost for heterogeneous agent ecosystems (Swarms, LangChain, AutoGen, CrewAI, Anthropic, etc.).
+
+\textbf{Error handling and timeouts.} Blockchain confirmation can take several seconds or more. The default settlement timeout is 300\,s. If the facilitator times out after sending the transaction, payment may still confirm on-chain; the middleware in that case may not decrypt, and the client would see an encrypted response. Operational guidance is to check the chain for the payer's recent transactions when timeouts occur and to consider idempotency or idempotent keys for retries.
+
+\textbf{Cost and pricing.} Hosts set \texttt{input\_cost\_per\_million\_usd} and \texttt{output\_cost\_per\_million\_usd}; the facilitator converts to SOL/USDC using its oracle. Pricing is thus host-defined and can vary by endpoint or over time. The treasury fee is a fixed percentage on the facilitator, creating a sustainable revenue model for the protocol while leaving most of the payment to the service provider.
+
+\textbf{Limitations.} The protocol does not define dispute resolution or refunds; those would require additional layers. Wallet keys in headers are sensitive; production deployments should combine ATP with stronger auth and key management. Finally, the current design is request-scoped: there is no built-in notion of sessions or multi-turn billing beyond per-response usage. Future work could introduce session identifiers, aggregated billing over a conversation, or escrow and dispute resolution contracts on-chain. Compatibility with existing agent frameworks (Swarms, LangChain, AutoGen, CrewAI, Anthropic) is achieved by ensuring that the response body includes usage in one of the formats recognized by the facilitator; the reference implementation includes example servers and clients for each of these frameworks, demonstrating that integration is a matter of adding the middleware and returning usage in the response, without changing the core agent logic.
+
+%==============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%==============================================================================
+
+We presented \atp{}, a protocol and implementation for agent-to-agent payments on \solana{}. By combining response encryption, centralized settlement in a facilitator, and on-chain execution with automatic payment splitting, \atp{} enables API hosts to charge for agent outputs in a transparent and framework-agnostic way. The design prioritizes simplicity of integration (middleware + client), format flexibility (facilitator-side usage parsing), and a clear security invariant (no plaintext output without confirmed payment). We expect \atp{} to serve as a foundational layer for the emerging agent economy, where agents and their owners can transact in SOL or USDC based on verifiable usage.
+
+%==============================================================================
+\section*{Acknowledgments}
+%==============================================================================
+
+This work is based on the ATP Protocol open-source project by The Swarm Corporation. We thank the contributors and the Solana ecosystem for infrastructure and tooling.
+
+%==============================================================================
+\bibliographystyle{plainnat}
+\begin{thebibliography}{99}
+
+\bibitem[x402]{x402}
+x402 Protocol. Payment-enabled HTTP. \url{https://github.com/xy402}.
+
+\bibitem[Agent economy]{agent-economy}
+T. Sandholm and V. Lesser. ``Issues in automated negotiation and electronic commerce: Extending the contract net framework.'' \textit{ICMAS}, 1995.
+
+\bibitem[MAS survey]{mas-survey}
+S. Russell and P. Norvig. ``Artificial Intelligence: A Modern Approach.'' Multi-agent systems. Pearson, 2020.
+
+\bibitem[Fair exchange]{fair-exchange}
+M. Franklin and M. Reiter. ``The design and implementation of a secure auction service.'' \textit{IEEE TSE}, 1996.
+
+\end{thebibliography}
+
+\end{document}

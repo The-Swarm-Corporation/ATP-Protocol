@@ -55,7 +55,6 @@ app.add_middleware(
     recipient_pubkey="7MaX4muAn8ZQREJxnupm8sgokwFHujgrGfH9Qn81BuEV",  # Your wallet receives 95% of payments
     payment_token=PaymentToken.SOL,  # Use SOL for payments
     wallet_private_key_header="x-wallet-private-key",  # Header for client wallet key
-    require_wallet=True,  # Require wallet key for payment
 )
 
 

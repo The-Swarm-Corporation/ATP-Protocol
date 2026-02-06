@@ -126,21 +126,28 @@ print(response["atp_settlement"])  # Payment details
 
 Below is a comprehensive table of example integrations and usage:
 
-| Category                | Example Link                                                                 | Description                                      |
-|-------------------------|------------------------------------------------------------------------------|--------------------------------------------------|
-| **Framework Integration** | [Swarms Framework](./examples/tutorials/swarms/)               | Enterprise multi-agent orchestration              |
-| **Framework Integration** | [LangChain](./examples/tutorials/langchain/)                   | Popular Python LLM framework                      |
-| **Framework Integration** | [AutoGen](./examples/tutorials/autogen/)                       | Microsoft's multi-agent framework                 |
-| **Framework Integration** | [CrewAI](./examples/tutorials/crewai/)                         | Multi-agent orchestration                         |
-| **Framework Integration** | [Anthropic](./examples/tutorials/anthropic/)                   | Claude API integration                            |
-| **Client Example**        | [Health Check](./examples/client/example_health_check.py)        | Check settlement service status                   |
-| **Client Example**        | [Parse Usage](./examples/client/example_parse_usage.py)          | Parse usage from various formats                  |
-| **Client Example**        | [Calculate Payment](./examples/client/example_calculate_payment.py) | Calculate payment without executing           |
-| **Client Example**        | [Execute Settlement](./examples/client/example_settle.py)        | Direct settlement execution                       |
-| **Client Example**        | [Make Request](./examples/client/example_request.py)             | Request ATP-protected endpoints                   |
-| **Server Example**        | [Basic Example](./examples/server/example.py)                    | Simple middleware setup                           |
-| **Server Example**        | [Full Flow](./examples/server/full_flow_example.py)              | Complete payment flow                             |
-| **Server Example**        | [Settlement Service](./examples/server/settlement_service_example.py) | Direct service usage                        |
+### Framework Integrations
+
+| Category                  | Example Link                                             | Description                            |
+|---------------------------|---------------------------------------------------------|----------------------------------------|
+| **Framework Integration** | [Swarms Framework](./examples/tutorials/swarms/)        | Enterprise multi-agent orchestration   |
+| **Framework Integration** | [LangChain](./examples/tutorials/langchain/)            | Popular Python LLM framework           |
+| **Framework Integration** | [AutoGen](./examples/tutorials/autogen/)                | Microsoft's multi-agent framework      |
+| **Framework Integration** | [CrewAI](./examples/tutorials/crewai/)                  | Multi-agent orchestration              |
+| **Framework Integration** | [Anthropic](./examples/tutorials/anthropic/)            | Claude API integration                 |
+
+### Client & Server Example Scripts
+
+| Category             | Example Link                                                        | Description                                |
+|----------------------|---------------------------------------------------------------------|--------------------------------------------|
+| **Client Example**   | [Health Check](./examples/client/example_health_check.py)           | Check settlement service status            |
+| **Client Example**   | [Parse Usage](./examples/client/example_parse_usage.py)             | Parse usage from various formats           |
+| **Client Example**   | [Calculate Payment](./examples/client/example_calculate_payment.py) | Calculate payment without executing        |
+| **Client Example**   | [Execute Settlement](./examples/client/example_settle.py)           | Direct settlement execution                |
+| **Client Example**   | [Make Request](./examples/client/example_request.py)                | Request ATP-protected endpoints            |
+| **Server Example**   | [Basic Example](./examples/server/example.py)                      | Simple middleware setup                    |
+| **Server Example**   | [Full Flow](./examples/server/full_flow_example.py)                | Complete payment flow                      |
+| **Server Example**   | [Settlement Service](./examples/server/settlement_service_example.py) | Direct service usage                     |
 
 See [examples/README.md](./examples/README.md) for complete documentation.
 

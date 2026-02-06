@@ -1,24 +1,3 @@
-"""
-Example: ATP Protocol with Swarms Framework
-
-This example demonstrates how to integrate ATP Protocol with Swarms agents
-to enable automatic payment processing for agent services.
-
-The example shows:
-1. Setting up a Swarms agent
-2. Creating a FastAPI API with ATP middleware
-3. Automatic payment processing after agent execution
-4. Usage tracking and billing
-
-Installation:
-    pip install swarms atp-protocol
-
-Environment Variables:
-    OPENAI_API_KEY="your-openai-api-key"
-    # Optional: Configure ATP settings
-    ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
-"""
-
 import os
 
 from fastapi import FastAPI, HTTPException
@@ -63,7 +42,6 @@ app.add_middleware(
     recipient_pubkey=recipient_key,  # Your wallet receives 95% of payments
     payment_token=PaymentToken.SOL,  # Use SOL for payments
     wallet_private_key_header="x-wallet-private-key",  # Header for client wallet key
-    require_wallet=True,  # Require wallet key for payment
     settlement_timeout=600.0,  # 10 minutes
 )
 

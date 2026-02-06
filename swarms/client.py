@@ -36,5 +36,6 @@ async def settle_payment():
 
 
 if __name__ == "__main__":
-    asyncio.run(print(json.dumps(settle_payment(), indent=4)))
+    result = asyncio.run(settle_payment())
+    print(json.dumps(result, indent=4))
 

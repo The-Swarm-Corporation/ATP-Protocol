@@ -399,8 +399,6 @@ If you use ATP (Agent Trade Protocol) in your research or software, please cite 
 }
 ```
 
-Plain text:
-
 > The Swarm Corporation. ATP: Agent Trade Protocol. https://github.com/The-Swarm-Corporation/ATP-Protocol
 
 ## Acknowledgments

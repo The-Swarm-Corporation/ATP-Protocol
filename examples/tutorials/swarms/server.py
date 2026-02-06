@@ -15,10 +15,11 @@ Installation:
 
 Environment Variables:
     OPENAI_API_KEY="your-openai-api-key"
-    # Optional: Configure ATP settings
+    ATP_RECIPIENT_PUBKEY="your-solana-wallet-public-key"  # Optional; or set in middleware below
     ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
 """
 
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger
@@ -52,7 +53,7 @@ app.add_middleware(
     ],
     input_cost_per_million_usd=10.0,  # $10 per million input tokens
     output_cost_per_million_usd=30.0,  # $30 per million output tokens
-    recipient_pubkey="7MaX4muAn8ZQREJxnupm8sgokwFHujgrGfH9Qn81BuEV",  # Your wallet receives 95% of payments
+    recipient_pubkey=os.getenv("ATP_RECIPIENT_PUBKEY", "7MaX4muAn8ZQREJxnupm8sgokwFHujgrGfH9Qn81BuEV"),  # Your wallet receives 95% of payments
     payment_token=PaymentToken.SOL,  # Use SOL for payments
     wallet_private_key_header="x-wallet-private-key",  # Header for client wallet key
 )
@@ -217,7 +218,7 @@ async def root():
         "payment": {
             "token": "SOL",
             "input_rate": "$10 per million tokens",
-            "output_rate": "$30 per million tokens",
+            "output_rate": "$30 per million output tokens",
             "fee": "5% to Swarms Treasury",
         },
     }
@@ -229,8 +230,7 @@ if __name__ == "__main__":
     logger.info("Starting ATP Protocol + Swarms Integration API...")
     logger.info("Make sure to set OPENAI_API_KEY environment variable")
     logger.info(
-        "Update recipient_pubkey in middleware configuration with your Solana wallet"
+        "Update recipient_pubkey in middleware configuration (or set ATP_RECIPIENT_PUBKEY) with your Solana wallet"
     )
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

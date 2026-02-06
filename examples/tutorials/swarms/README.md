@@ -31,28 +31,16 @@ OPENAI_API_KEY="your-openai-api-key"
 # Required: Solana wallet private key (for client)
 ATP_PRIVATE_KEY="[1,2,3,...]"  # JSON array format or base58 string
 
+# Optional: Recipient wallet (server); defaults to example key if not set
+ATP_RECIPIENT_PUBKEY="your-solana-wallet-public-key"
+
 # Optional: ATP Settlement Service URL
 ATP_SETTLEMENT_URL="https://facilitator.swarms.world"
 ```
 
 ## Configuration
 
-Before running the server, update the `recipient_pubkey` in `server.py`:
-
-```python
-app.add_middleware(
-    ATPSettlementMiddleware,
-    allowed_endpoints=["/v1/agent/execute", "/v1/agent/chat"],
-    input_cost_per_million_usd=10.0,
-    output_cost_per_million_usd=30.0,
-    recipient_pubkey="YourSolanaWalletHere",  # ← Update this!
-    payment_token=PaymentToken.SOL,
-    wallet_private_key_header="x-wallet-private-key",
-    require_wallet=True,
-)
-```
-
-Replace `"YourSolanaWalletHere"` with your actual Solana wallet public key (the address that will receive payments).
+Before running the server, set `ATP_RECIPIENT_PUBKEY` in `.env` or update `recipient_pubkey` in `server.py` (the middleware uses the env var with a fallback).
 
 ## Running the Server
 
@@ -232,5 +220,4 @@ agent = Agent(
 
 - [Swarms Framework](https://github.com/kyegomez/swarms)
 - [Swarms Documentation](https://docs.swarms.world)
-- [ATP Protocol Documentation](../README.md)
-
+- [ATP Protocol Documentation](../../../README.md)

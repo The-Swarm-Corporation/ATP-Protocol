@@ -156,7 +156,8 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
     **Notes:**
 
     - The middleware only processes successful responses (status_code < 400).
-    - If usage data cannot be parsed, the original response is returned without settlement.
+    - If usage data cannot be parsed (no input_tokens, output_tokens, or total_tokens
+      in the response), the middleware raises HTTP 422 with an error message.
     - Settlement operations may take time due to blockchain confirmation. Increase
       `settlement_timeout` if you experience timeout errors even when payments succeed.
     - The treasury pubkey is configured on the settlement service and cannot be
@@ -380,7 +381,8 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
 
         **Error Scenarios:**
             - Missing wallet (if required): Returns 402 Payment Required
-            - No usage data: Returns original response without settlement
+            - No usage data: Raises 422 with message that endpoint must output
+                input_tokens, output_tokens, or total_tokens (or equivalent usage fields)
             - Encryption failure: Returns 500 with error (response not exposed)
             - Settlement failure: Returns encrypted response with error details
                 (or raises exception if `fail_on_settlement_error=True`)
@@ -419,18 +421,14 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
                 f"No usage data found in response for {path}. "
                 "Settlement service could not parse usage from response body."
             )
-            # Return original response if no usage found
-            # Remove Content-Length header since we consumed the body iterator
-            new_headers = dict(response.headers)
-            new_headers.pop("content-length", None)
-            new_headers.pop("Content-Length", None)
-            new_headers.pop("content-encoding", None)
-            new_headers.pop("Content-Encoding", None)
-            return Response(
-                content=response_body,
-                status_code=response.status_code,
-                headers=new_headers,
-                media_type=response.media_type,
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Endpoint must include token usage in the response. "
+                    "Response must contain at least one of: input_tokens, output_tokens, or total_tokens "
+                    "(or equivalent fields such as prompt_tokens/completion_tokens in a usage object). "
+                    f"No parseable usage data found for {path}."
+                ),
             )
 
         # Encrypt the agent response before payment verification

@@ -15,6 +15,18 @@ load_dotenv()
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
+    """
+    Retrieve a boolean value from an environment variable.
+
+    Args:
+        name (str): The name of the environment variable.
+        default (bool, optional): The default value to return if the variable is not set.
+
+    Returns:
+        bool: True if the environment variable contains a truthy value
+              (one of "1", "true", "yes", "y", "on", case-insensitive),
+              otherwise False or the provided default.
+    """
     v = os.getenv(name)
     if v is None:
         return default
@@ -22,6 +34,15 @@ def _bool_env(name: str, default: bool = False) -> bool:
 
 
 def _float_env(name: str) -> Optional[float]:
+    """
+    Retrieve a float value from an environment variable.
+
+    Args:
+        name (str): The name of the environment variable.
+
+    Returns:
+        Optional[float]: The float value if set and valid, otherwise None.
+    """
     v = os.getenv(name)
     if v is None:
         return None

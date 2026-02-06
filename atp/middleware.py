@@ -1,15 +1,33 @@
 """
-FastAPI middleware for ATP settlement on any endpoint.
+ATP Settlement Middleware — server-side FastAPI integration.
 
-This middleware enables automatic payment deduction from Solana wallets
-based on token usage (input/output tokens) for any configured endpoint.
+This module provides :class:`ATPSettlementMiddleware`, which adds automatic
+ATP (Agent Transfer Protocol) settlement to selected FastAPI endpoints. Use it
+when you host APIs that should charge callers per token usage (e.g. LLM or
+agent endpoints).
 
-The middleware delegates all settlement logic to the ATP Settlement Service,
-ensuring immutable and centralized settlement operations.
+**What it does**
 
-The middleware accepts wallet private keys directly via headers, making it
-simple to use without requiring API key management. Users can add their
-own API key handling layer if needed.
+- Intercepts responses from configured endpoints and extracts token usage.
+- Sends usage to the ATP Settlement Service for parsing and payment calculation.
+- Encrypts agent output until payment is confirmed on Solana.
+- Deducts payment from the caller’s wallet and credits the recipient (and treasury).
+
+All settlement logic runs in the Settlement Service; the middleware only wires
+requests/responses and enforces pay-before-decrypt behavior.
+
+**Wallet authentication**
+
+Callers pass their Solana wallet private key via a configurable header (default
+``x-wallet-private-key``). For production, add your own API-key or auth layer
+in front if needed.
+
+**See also**
+
+- :class:`atp.client.ATPClient` — client for calling ATP-protected endpoints and
+  for using the facilitator (settlement service) directly.
+- :class:`atp.settlement_client.SettlementServiceClient` — low-level HTTP client
+  for the settlement service.
 """
 
 from __future__ import annotations
@@ -33,8 +51,11 @@ from atp.settlement_client import (
 
 class ATPSettlementMiddleware(BaseHTTPMiddleware):
     """
-    FastAPI middleware that automatically deducts payment from Solana wallets
-    based on token usage for configured endpoints.
+    FastAPI middleware that performs ATP settlement on selected endpoints.
+
+    Automatically deducts payment from the caller’s Solana wallet based on token
+    usage (input/output tokens) for each configured path. Use this on the
+    *server* side when you host APIs that should be paid per use.
 
     This middleware intercepts responses from specified endpoints, extracts usage
     information (input/output tokens), calculates payment amounts, and executes
@@ -164,6 +185,9 @@ class ATPSettlementMiddleware(BaseHTTPMiddleware):
       overridden by the middleware.
     - Wallet private keys are passed directly via headers. For production, consider
       adding an API key layer or using secure key management.
+
+    **See also:** :class:`atp.client.ATPClient` for calling ATP-protected endpoints
+    and using the facilitator from the client side.
     """
 
     def __init__(
@@ -639,17 +663,39 @@ def create_settlement_middleware(
     **kwargs: Any,
 ) -> type[ATPSettlementMiddleware]:
     """
-    Factory function to create a configured ATP settlement middleware.
+    Factory that returns a middleware class with all settlement options pre-bound.
+
+    Use this when you want to add the middleware with only the ASGI ``app``
+    (e.g. so Starlette/FastAPI can instantiate it with just ``app``). All other
+    arguments are fixed at factory call time.
+
+    Args:
+        allowed_endpoints: Endpoint paths to apply settlement to.
+        input_cost_per_million_usd: Cost per million input tokens in USD.
+        output_cost_per_million_usd: Cost per million output tokens in USD.
+        **kwargs: Passed through to :class:`ATPSettlementMiddleware` (e.g.
+            ``recipient_pubkey``, ``wallet_private_key_header``, ``payment_token``,
+            ``settlement_service_url``, ``fail_on_settlement_error``, ``settlement_timeout``).
+
+    Returns:
+        A subclass of :class:`ATPSettlementMiddleware` whose constructor takes
+        only ``app``.
 
     Example:
-        middleware = create_settlement_middleware(
+        ```python
+        from fastapi import FastAPI
+        from atp.middleware import create_settlement_middleware
+
+        SettlementMiddleware = create_settlement_middleware(
             allowed_endpoints=["/v1/chat", "/v1/completions"],
             input_cost_per_million_usd=10.0,
             output_cost_per_million_usd=30.0,
-            wallet_private_key_header="x-wallet-private-key",
-            recipient_pubkey="YourPublicKeyHere",  # Required: recipient wallet public key
+            recipient_pubkey="YourRecipientPublicKeyHere",
+            settlement_service_url="https://facilitator.swarms.world",
         )
-        app.add_middleware(middleware)
+        app = FastAPI()
+        app.add_middleware(SettlementMiddleware)
+        ```
     """
     return type(
         "ConfiguredATPSettlementMiddleware",

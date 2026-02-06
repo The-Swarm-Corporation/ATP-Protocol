@@ -1,10 +1,24 @@
 """
-User-facing client API for ATP Protocol.
+ATP Client — user-facing API for the ATP Protocol.
 
-This module provides a simple, high-level interface for:
-1. Calling the facilitator (settlement service) directly
-2. Making requests to services protected by ATP middleware
-3. Handling wallet authentication and settlement automatically
+This module provides :class:`ATPClient`, a high-level client for:
+
+1. **Calling the facilitator (settlement service)** — parse usage, calculate
+   payment, execute settlement (pay recipient + treasury on Solana).
+2. **Calling ATP-protected endpoints** — send requests with wallet auth in
+   headers and automatically decrypt responses after payment is confirmed.
+3. **Health checks** — verify the settlement service is reachable.
+
+Use this client when you are a *caller* of ATP-protected APIs or when you want
+to run settlement flows (e.g. pay a recipient for token usage) without going
+through an HTTP endpoint.
+
+**See also**
+
+- :class:`atp.middleware.ATPSettlementMiddleware` — server-side FastAPI middleware
+  that protects endpoints and performs settlement; use when you *host* the API.
+- :class:`atp.settlement_client.SettlementServiceClient` — low-level HTTP client
+  for the settlement service.
 """
 
 from __future__ import annotations
@@ -26,14 +40,20 @@ from loguru import logger
 
 class ATPClient:
     """
-    User-facing client for ATP Protocol.
-    
-    This client provides a simple interface for:
-    - Calling the facilitator (settlement service) for payment operations
-    - Making requests to ATP-protected endpoints with automatic wallet handling
-    - Parsing usage data and calculating payments
-    - Handling encrypted responses from ATP middleware
-    
+    User-facing client for the ATP Protocol.
+
+    Use this client to call the facilitator (settlement service) or to call
+    APIs protected by :class:`atp.middleware.ATPSettlementMiddleware`. The client
+    adds wallet authentication to requests and can decrypt responses that the
+    middleware encrypts until payment is confirmed.
+
+    **Capabilities**
+
+    - **Facilitator**: :meth:`parse_usage`, :meth:`calculate_payment`, :meth:`settle`, :meth:`health_check`
+    - **ATP-protected APIs**: :meth:`request`, :meth:`post`, :meth:`get` (wallet in headers, optional auto-decrypt)
+
+    **See also:** :class:`atp.middleware.ATPSettlementMiddleware` (server-side).
+
     **Example Usage:**
     
         ```python

@@ -284,39 +284,6 @@ The settlement service (facilitator) handles:
 See [Settlement Service Documentation](https://docs.swarms.ai/docs/atp/facilitator) for complete API reference.
 
 
-## Development
-
-### Requirements
-
-- Python 3.10+
-- FastAPI (for middleware)
-- Solana wallet (for payments)
-
-### Installation from Source
-
-```bash
-git clone https://github.com/The-Swarm-Corporation/ATP-Protocol.git
-cd ATP-Protocol
-pip install -e .
-```
-
-### Running Tests
-
-```bash
-pytest tests/
-```
-
-### Code Quality
-
-```bash
-# Format code
-black .
-
-# Lint code
-ruff check .
-```
-
-
 ## Error Handling
 
 ### Missing Wallet Key
@@ -379,6 +346,40 @@ The response remains encrypted until payment succeeds.
 ## Contributing
 
 Contributions are welcome. Please read our contributing guidelines and submit pull requests for review.
+
+
+## Development
+
+### Requirements
+
+- Python 3.10+
+- FastAPI (for middleware)
+- Solana wallet (for payments)
+
+### Installation from Source
+
+```bash
+git clone https://github.com/The-Swarm-Corporation/ATP-Protocol.git
+cd ATP-Protocol
+pip install -e .
+```
+
+### Running Tests
+
+```bash
+pytest tests/
+```
+
+### Code Quality
+
+```bash
+# Format code
+black .
+
+# Lint code
+ruff check .
+```
+
 
 ## License
 
